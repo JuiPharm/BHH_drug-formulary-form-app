@@ -1,0 +1,9 @@
+{
+  "name": "ระบบเสนอยาเข้าบัญชียา",
+  "short_name": "Drug Formulary",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#075985",
+  "lang": "th"
+}

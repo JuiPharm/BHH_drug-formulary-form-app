@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="ระบบเสนอยาเข้าบัญชียา โรงพยาบาลกรุงเทพหาดใหญ่">
+  <title>ระบบเสนอยาเข้าบัญชียา</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./assets/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div>
+        <p class="eyebrow">Drug Formulary Submission</p>
+        <h1 id="app-title">ระบบเสนอยาเข้าบัญชียา</h1>
+        <p id="hospital-name" class="header-subtitle">โรงพยาบาลกรุงเทพหาดใหญ่</p>
+      </div>
+      <div class="system-pill" id="system-status" aria-live="polite">กำลังเชื่อมต่อระบบ…</div>
+    </div>
+  </header>
+
+  <main class="container main-layout">
+    <aside class="sidebar" aria-label="ขั้นตอนการกรอกข้อมูล">
+      <ol id="stepper" class="stepper"></ol>
+      <section class="help-card">
+        <h2>ข้อควรทราบ</h2>
+        <p>ข้อมูลจะถูกบันทึกเป็นแบบร่างใน Browser โดยอัตโนมัติ แต่ไฟล์แนบจะไม่ถูกเก็บหลัง Refresh หน้า</p>
+        <button id="clear-draft-btn" type="button" class="text-button danger-text">ล้างแบบร่าง</button>
+      </section>
+      <section id="public-templates-card" class="help-card hidden">
+        <h2>เอกสารดาวน์โหลด</h2>
+        <div id="public-templates-list" class="template-list"></div>
+      </section>
+    </aside>
+
+    <section class="content-panel">
+      <div id="global-alert" class="alert hidden" role="alert"></div>
+
+      <form id="submission-form" novalidate>
+        <section class="form-step active" data-step="0">
+          <div class="section-heading">
+            <span class="section-number">1</span>
+            <div><h2>ข้อมูลบริษัทและผู้แทน</h2><p>ช่องที่มีเครื่องหมาย * เป็นข้อมูลบังคับ</p></div>
+          </div>
+
+          <fieldset>
+            <legend>ข้อมูลบริษัท</legend>
+            <div class="grid two-columns">
+              <label class="field full"><span>ชื่อบริษัท *</span><input name="companyName" autocomplete="organization" required></label>
+              <label class="field full"><span>ที่อยู่บริษัท</span><textarea name="companyAddress" rows="2" autocomplete="street-address"></textarea></label>
+              <label class="field"><span>E-mail บริษัท *</span><input type="email" name="companyEmail" autocomplete="email" required></label>
+              <label class="field"><span>เบอร์โทรศัพท์บริษัท *</span><input type="tel" name="companyPhone" autocomplete="tel" required></label>
+              <label class="field"><span>หมายเลขต่อ</span><input name="companyPhoneExtension" inputmode="numeric"></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>ข้อมูลผู้แทนบริษัท</legend>
+            <div class="grid two-columns">
+              <label class="field"><span>ชื่อ-นามสกุลผู้แทน *</span><input name="representativeName" autocomplete="name" required></label>
+              <label class="field"><span>ตำแหน่ง *</span><input name="representativePosition" required></label>
+              <label class="field"><span>E-mail ผู้แทน *</span><input type="email" name="representativeEmail" autocomplete="email" required></label>
+              <label class="field"><span>เบอร์โทรศัพท์ผู้แทน *</span><input type="tel" name="representativePhone" autocomplete="tel" required></label>
+              <label class="field"><span>เบอร์โทรศัพท์สำรอง</span><input type="tel" name="representativeAlternatePhone"></label>
+            </div>
+          </fieldset>
+        </section>
+
+        <section class="form-step" data-step="1">
+          <div class="section-heading"><span class="section-number">2</span><div><h2>ข้อมูลผลิตภัณฑ์</h2><p>ระบบตรวจข้อมูลซ้ำจาก Brand Name + Strength + Dosage Form</p></div></div>
+          <fieldset>
+            <legend>ข้อมูลระบุตัวผลิตภัณฑ์</legend>
+            <div class="grid two-columns">
+              <label class="field"><span>Brand Name *</span><input name="brandName" required></label>
+              <label class="field"><span>Generic Name *</span><input name="genericName" required></label>
+              <label class="field"><span>Strength *</span><input name="strength" placeholder="เช่น 500 mg" required></label>
+              <label class="field"><span>Dosage Form *</span><input name="dosageForm" placeholder="เช่น Film-coated tablet" required></label>
+            </div>
+            <div id="duplicate-result" class="inline-status neutral" aria-live="polite">ยังไม่ได้ตรวจข้อมูลซ้ำ</div>
+            <button type="button" id="check-duplicate-btn" class="secondary-button">ตรวจข้อมูลซ้ำ</button>
+          </fieldset>
+
+          <fieldset>
+            <legend>ผู้ผลิตและลักษณะผลิตภัณฑ์</legend>
+            <div class="grid two-columns">
+              <label class="field"><span>บริษัทผู้ผลิต *</span><input name="manufacturerName" required></label>
+              <label class="field"><span>ประเทศผู้ผลิต *</span><input name="countryOfManufacture" required></label>
+              <label class="field full"><span>ผู้จำหน่ายในประเทศไทย *</span><input name="thailandDistributor" required></label>
+              <label class="field"><span>Classification *</span><input name="classification" required></label>
+              <label class="field"><span>Unit Quantity *</span><input name="unitQuantity" placeholder="เช่น 10 tablets/blister" required></label>
+              <label class="field full"><span>ส่วนประกอบทางเคมี *</span><textarea name="chemicalComposition" rows="3" required></textarea></label>
+              <label class="field"><span>Shelf Life *</span><input name="shelfLife" placeholder="เช่น 24 เดือน" required></label>
+              <label class="field"><span>Storage *</span><input name="storage" placeholder="เช่น เก็บต่ำกว่า 30°C" required></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>เงื่อนไขผลิตภัณฑ์</legend>
+            <div class="choice-grid">
+              <div class="choice-group"><span class="choice-label">เป็นผลิตภัณฑ์นำเข้าหรือไม่ *</span><label><input type="radio" name="isImportedProduct" value="true" required> ใช่</label><label><input type="radio" name="isImportedProduct" value="false" required> ไม่ใช่</label></div>
+              <div class="choice-group"><span class="choice-label">เป็นยา RMP หรือไม่ *</span><label><input type="radio" name="rmp" value="true" required> Yes</label><label><input type="radio" name="rmp" value="false" required> No</label></div>
+            </div>
+          </fieldset>
+        </section>
+
+        <section class="form-step" data-step="2">
+          <div class="section-heading"><span class="section-number">3</span><div><h2>ข้อมูลทางเภสัชวิทยาคลินิก</h2><p>ใช้ข้อมูลนี้ Merge ลงใน PDF ตาม Template โรงพยาบาล</p></div></div>
+          <div class="grid two-columns">
+            <label class="field full"><span>Indication *</span><textarea name="indication" rows="3" required></textarea></label>
+            <label class="field full"><span>Pharmacological Action *</span><textarea name="pharmacologicalAction" rows="3" required></textarea></label>
+            <label class="field full"><span>Side Effects *</span><textarea name="sideEffects" rows="3" required></textarea></label>
+            <label class="field full"><span>Contraindications *</span><textarea name="contraindications" rows="3" required></textarea></label>
+            <label class="field full"><span>Dosage *</span><textarea name="dosage" rows="3" required></textarea></label>
+            <label class="field full"><span>Drug Interaction *</span><textarea name="drugInteraction" rows="3" required></textarea></label>
+            <label class="field full"><span>Pregnancy / Lactation *</span><textarea name="pregnancyLactation" rows="3" required></textarea></label>
+            <label class="field full"><span>Pediatric / Geriatric Use *</span><textarea name="pediatricGeriatricUse" rows="3" required></textarea></label>
+            <label class="field full"><span>Hepatic / Renal Dose Adjustment *</span><textarea name="hepaticRenalDoseAdjustment" rows="3" required></textarea></label>
+            <label class="field full"><span>การบดหรือแบ่งเม็ดยา</span><textarea name="tabletCrushingSplitting" rows="2"></textarea></label>
+            <label class="field full"><span>อายุหลังผสม</span><textarea name="stabilityAfterReconstitution" rows="2"></textarea></label>
+          </div>
+        </section>
+
+        <section class="form-step" data-step="3">
+          <div class="section-heading"><span class="section-number">4</span><div><h2>ข้อมูลการเสนอและแพทย์</h2><p>ข้อมูลแพทย์และผู้เห็นชอบยังไม่บังคับในขั้นบริษัท Submit</p></div></div>
+          <fieldset>
+            <legend>การเปรียบเทียบและราคา</legend>
+            <div class="grid two-columns">
+              <label class="field full"><span>ยาที่มีคุณสมบัติคล้ายกันในบัญชีเดิม</span><input name="comparableExistingDrug"></label>
+              <label class="field full"><span>จุดเด่นเมื่อเปรียบเทียบกับยาเดิม *</span><textarea name="comparativeAdvantage" rows="4" required></textarea></label>
+              <label class="field"><span>ค่าใช้จ่ายต่อ Course การรักษา</span><input name="costPerCourse"></label>
+              <label class="field"><span>ราคาที่เสนอ</span><input name="proposedPrice"></label>
+              <label class="field"><span>จำนวนยาตัวอย่าง</span><input name="sampleQuantity"></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>แพทย์ผู้เสนอ — Optional</legend>
+            <div class="grid two-columns">
+              <label class="field"><span>ชื่อแพทย์</span><input name="physicianName"></label>
+              <label class="field"><span>คำนำหน้าวิชาชีพ</span><input name="physicianProfessionalTitle" placeholder="เช่น นพ. / พญ."></label>
+              <label class="field"><span>แผนก</span><input name="physicianDepartment"></label>
+              <label class="field"><span>สาขา</span><input name="physicianSpecialty"></label>
+              <label class="field"><span>เบอร์โทรศัพท์แพทย์</span><input type="tel" name="physicianPhone"></label>
+              <label class="field"><span>ความเร่งด่วน</span><select name="urgency"><option value="">ไม่ระบุ</option><option value="URGENT">เร่งด่วน</option><option value="NON_URGENT">ไม่เร่งด่วน</option></select></label>
+              <label class="field"><span>ระยะเวลาเร่งด่วน</span><input name="urgencyDuration" placeholder="เช่น ภายใน 24 ชั่วโมง"></label>
+              <label class="field full"><span>เหตุผลในการเสนอ</span><textarea name="proposalReason" rows="3"></textarea></label>
+              <div class="field full"><span>จำกัดการสั่งใช้เฉพาะแพทย์หรือไม่</span><div class="inline-options"><label><input type="radio" name="useRestrictionRequired" value="true"> ใช่</label><label><input type="radio" name="useRestrictionRequired" value="false"> ไม่ใช่</label></div></div>
+              <label class="field full"><span>สาขาแพทย์ที่อนุญาตให้สั่งใช้</span><input name="restrictedSpecialty"></label>
+              <label class="field full"><span>ยาที่เสนอให้ตัดออกจากบัญชี</span><textarea name="drugToRemove" rows="2"></textarea></label>
+              <label class="field full"><span>ผลกระทบต่อผู้ป่วยหากยาไม่เข้าบัญชี</span><textarea name="impactIfNotApproved" rows="2"></textarea></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>ผู้เห็นชอบ — Optional สูงสุด 6 คน</legend>
+            <div id="approvers-container" class="repeat-list"></div>
+            <button type="button" id="add-approver-btn" class="secondary-button">+ เพิ่มผู้เห็นชอบ</button>
+          </fieldset>
+        </section>
+
+        <section class="form-step" data-step="4">
+          <div class="section-heading"><span class="section-number">5</span><div><h2>เอกสารประกอบ</h2><p id="upload-limit-text">กำลังโหลดข้อจำกัดไฟล์…</p></div></div>
+          <div id="document-list" class="document-list"></div>
+          <div class="upload-summary"><strong>ขนาดไฟล์รวม:</strong> <span id="total-file-size">0 B</span><span id="total-file-warning" class="danger-text"></span></div>
+        </section>
+
+        <section class="form-step" data-step="5">
+          <div class="section-heading"><span class="section-number">6</span><div><h2>ตรวจสอบและส่งคำขอ</h2><p>เมื่อ Submit ระบบจะสร้างโฟลเดอร์ บันทึกข้อมูล และสร้าง PDF ตาม Template</p></div></div>
+          <div id="review-content" class="review-content"></div>
+          <label class="declaration"><input type="checkbox" name="declarationAccepted" required><span>ข้าพเจ้ายืนยันว่าข้อมูลและเอกสารที่ส่งมีความถูกต้อง และยอมรับเงื่อนไขการเสนอยาของโรงพยาบาล *</span></label>
+          <div id="submit-progress" class="progress-panel hidden" aria-live="polite"><div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div><p id="progress-message">กำลังเตรียมข้อมูล…</p></div>
+        </section>
+
+        <div class="form-actions" id="form-actions">
+          <button type="button" id="previous-btn" class="secondary-button hidden">ย้อนกลับ</button>
+          <div class="action-spacer"></div>
+          <button type="button" id="next-btn" class="primary-button">ถัดไป</button>
+          <button type="submit" id="submit-btn" class="primary-button hidden">Submit คำขอ</button>
+        </div>
+      </form>
+
+      <section id="success-panel" class="success-panel hidden" aria-live="polite">
+        <div class="success-icon">✓</div>
+        <h2>ส่งคำขอสำเร็จ</h2>
+        <p>เลขคำขอ</p>
+        <div class="submission-number"><span id="success-submission-no"></span><button id="copy-submission-no" type="button" class="icon-button" title="คัดลอกเลขคำขอ">คัดลอก</button></div>
+        <p id="success-status" class="status-badge"></p>
+        <p id="success-message"></p>
+        <div class="success-actions">
+          <button id="download-pdf-btn" type="button" class="primary-button">ดาวน์โหลด PDF สำหรับแพทย์ลงนาม</button>
+          <button id="new-submission-btn" type="button" class="secondary-button">สร้างคำขอใหม่</button>
+        </div>
+        <p class="security-note">PDF ที่ลงนามแล้วจะส่งให้ฝ่ายเภสัชกรรม และ Admin เป็นผู้อัปโหลดเข้าระบบจากรายการยานั้น</p>
+      </section>
+    </section>
+  </main>
+
+  <footer class="site-footer"><div class="container"><span id="footer-system-info">Drug Formulary Form App</span></div></footer>
+  <div id="toast" class="toast hidden" role="status"></div>
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
