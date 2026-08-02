@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="description" content="ระบบบริหารคำขอเสนอยาเข้าบัญชียา โรงพยาบาลกรุงเทพหาดใหญ่">
+  <title>Drug Formulary Admin</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./assets/admin.css">
+</head>
+<body>
+  <div id="global-alert" class="global-alert hidden" role="alert"></div>
+
+  <main id="login-view" class="login-layout">
+    <section class="login-card" aria-labelledby="login-title">
+      <div class="brand-mark">BHH</div>
+      <p class="eyebrow">Drug Formulary Administration</p>
+      <h1 id="login-title">เข้าสู่ระบบ Admin</h1>
+      <p id="login-hospital" class="muted">โรงพยาบาลกรุงเทพหาดใหญ่</p>
+      <form id="login-form">
+        <label class="field">
+          <span>E-mail</span>
+          <input id="login-email" type="email" autocomplete="username" required>
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <div class="password-wrap">
+            <input id="login-password" type="password" autocomplete="current-password" required>
+            <button id="toggle-password" type="button" class="text-button">แสดง</button>
+          </div>
+        </label>
+        <button id="login-button" type="submit" class="primary-button full">Login</button>
+      </form>
+      <p class="security-note">ระบบเก็บเฉพาะ Password Hash ใน Google Sheet และ Session จะหมดอายุอัตโนมัติ</p>
+      <p id="login-system-info" class="version-text"></p>
+    </section>
+  </main>
+
+  <div id="admin-view" class="admin-shell hidden">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Drug Formulary Admin</p>
+        <h1 id="admin-title">ระบบบริหารคำขอเสนอยา</h1>
+      </div>
+      <div class="user-area">
+        <div>
+          <strong id="admin-display-name"></strong>
+          <span id="admin-email" class="muted small"></span>
+        </div>
+        <button id="logout-button" type="button" class="secondary-button">ออกจากระบบ</button>
+      </div>
+    </header>
+
+    <main class="page-container">
+      <section id="summary-cards" class="summary-grid" aria-label="สรุปรายการ"></section>
+
+      <section class="panel">
+        <div class="panel-head responsive-head">
+          <div>
+            <h2>รายการยา</h2>
+            <p class="muted">ค้นหาจากเลขคำขอ ชื่อยา ความแรง หรือรูปแบบยา</p>
+          </div>
+          <button id="refresh-button" type="button" class="secondary-button">รีเฟรช</button>
+        </div>
+        <form id="filter-form" class="filter-row">
+          <label class="field grow">
+            <span>ค้นหา</span>
+            <input id="search-input" placeholder="เช่น DF-2026-0001 หรือ Brand Name">
+          </label>
+          <label class="field">
+            <span>สถานะ</span>
+            <select id="status-filter">
+              <option value="">ทุกสถานะ</option>
+            </select>
+          </label>
+          <button type="submit" class="primary-button filter-button">ค้นหา</button>
+        </form>
+        <div id="table-loading" class="loading-state hidden">กำลังโหลดรายการ…</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>เลขคำขอ</th>
+                <th>ผลิตภัณฑ์</th>
+                <th>สถานะ</th>
+                <th>วันที่ Submit</th>
+                <th>แบบเซ็น</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="submission-tbody"></tbody>
+          </table>
+        </div>
+        <p id="empty-state" class="empty-state hidden">ไม่พบรายการตามเงื่อนไข</p>
+      </section>
+    </main>
+  </div>
+
+  <div id="detail-backdrop" class="backdrop hidden"></div>
+  <aside id="detail-drawer" class="detail-drawer hidden" aria-label="รายละเอียดคำขอ">
+    <header class="drawer-head">
+      <div>
+        <p id="detail-submission-no" class="eyebrow"></p>
+        <h2 id="detail-product-name">รายละเอียดคำขอ</h2>
+      </div>
+      <button id="close-detail-button" type="button" class="icon-button" aria-label="ปิด">×</button>
+    </header>
+    <div id="detail-loading" class="loading-state">กำลังโหลดรายละเอียด…</div>
+    <div id="detail-content" class="drawer-content hidden">
+      <section id="detail-overview" class="detail-section"></section>
+      <section class="detail-section">
+        <h3>จัดการสถานะ</h3>
+        <form id="status-update-form" class="stack-form">
+          <label class="field">
+            <span>สถานะใหม่</span>
+            <select id="new-status-select" required></select>
+          </label>
+          <label id="reject-reason-field" class="field hidden">
+            <span>เหตุผลที่ไม่ผ่าน *</span>
+            <textarea id="reject-reason" rows="3"></textarea>
+          </label>
+          <label class="field">
+            <span>หมายเหตุ</span>
+            <textarea id="status-note" rows="2"></textarea>
+          </label>
+          <button type="submit" class="primary-button">บันทึกสถานะ</button>
+        </form>
+      </section>
+      <section class="detail-section">
+        <h3>แบบฟอร์มแพทย์ลงนามแล้ว</h3>
+        <form id="signed-upload-form" class="stack-form">
+          <label class="field">
+            <span>เลือกไฟล์ PDF</span>
+            <input id="signed-file-input" type="file" accept="application/pdf,.pdf" required>
+          </label>
+          <button type="submit" class="primary-button">อัปโหลดแบบฟอร์มหลังเซ็น</button>
+        </form>
+      </section>
+      <section class="detail-section">
+        <div class="section-row">
+          <h3>เอกสารประกอบ</h3>
+          <button id="retry-pdf-button" type="button" class="secondary-button">สร้าง PDF ใหม่</button>
+        </div>
+        <div id="document-list" class="document-list"></div>
+      </section>
+      <section class="detail-section">
+        <h3>ประวัติสถานะ</h3>
+        <div id="history-list" class="timeline"></div>
+      </section>
+    </div>
+  </aside>
+
+  <div id="toast" class="toast hidden" role="status"></div>
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

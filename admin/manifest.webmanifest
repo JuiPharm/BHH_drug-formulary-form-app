@@ -1,0 +1,9 @@
+{
+  "name": "Drug Formulary Admin",
+  "short_name": "Formulary Admin",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#eef3f8",
+  "theme_color": "#075985",
+  "lang": "th"
+}
