@@ -50,6 +50,13 @@ const historyList = document.querySelector('#history-list');
 const newStatusSelect = document.querySelector('#new-status-select');
 const rejectReasonField = document.querySelector('#reject-reason-field');
 const toast = document.querySelector('#toast');
+const passwordModal = document.querySelector('#password-modal');
+const passwordModalBackdrop = document.querySelector('#password-modal-backdrop');
+const changePasswordForm = document.querySelector('#change-password-form');
+const currentPasswordInput = document.querySelector('#current-password');
+const newPasswordInput = document.querySelector('#new-password');
+const confirmNewPasswordInput = document.querySelector('#confirm-new-password');
+const savePasswordButton = document.querySelector('#save-password-button');
 
 const state = {
   config: { maximumFileSizeMb: 10 },
@@ -121,6 +128,11 @@ async function loadPublicConfig() {
     document.querySelector('#login-hospital').textContent = adminConfig.hospitalName || 'โรงพยาบาลกรุงเทพหาดใหญ่';
     document.querySelector('#login-system-info').textContent = `Backend v${adminConfig.appVersion || '—'} · Admin App v${ADMIN_APP_CONFIG.APP_VERSION}`;
     document.querySelector('#admin-title').textContent = adminConfig.appName || 'ระบบบริหารคำขอเสนอยา';
+    const minimumLength = Math.max(Number(adminConfig.passwordMinimumLength || 8), 8);
+    newPasswordInput.minLength = minimumLength;
+    confirmNewPasswordInput.minLength = minimumLength;
+    document.querySelector('#password-policy-text').textContent =
+      `อย่างน้อย ${minimumLength} ตัวอักษร และต้องมีทั้งตัวอักษรกับตัวเลข`;
   } catch (error) {
     showAlert(error.message);
   }
@@ -131,6 +143,84 @@ function showLogin() {
   loginView.classList.remove('hidden');
   loginPassword.value = '';
   loginEmail.focus();
+}
+
+
+function passwordMinimumLength() {
+  return Math.max(Number(state.config.passwordMinimumLength || 8), 8);
+}
+
+function openPasswordModal() {
+  const minimumLength = passwordMinimumLength();
+  currentPasswordInput.value = '';
+  newPasswordInput.value = '';
+  confirmNewPasswordInput.value = '';
+  newPasswordInput.minLength = minimumLength;
+  confirmNewPasswordInput.minLength = minimumLength;
+  document.querySelector('#password-policy-text').textContent =
+    `อย่างน้อย ${minimumLength} ตัวอักษร และต้องมีทั้งตัวอักษรกับตัวเลข`;
+  passwordModalBackdrop.classList.remove('hidden');
+  passwordModal.classList.remove('hidden');
+  window.setTimeout(() => currentPasswordInput.focus(), 0);
+}
+
+function closePasswordModal() {
+  passwordModalBackdrop.classList.add('hidden');
+  passwordModal.classList.add('hidden');
+  changePasswordForm.reset();
+  changePasswordForm.querySelectorAll('[data-toggle-password]').forEach(button => {
+    const input = document.querySelector(`#${button.dataset.togglePassword}`);
+    if (input) input.type = 'password';
+    button.textContent = 'แสดง';
+  });
+}
+
+async function handleChangePassword(event) {
+  event.preventDefault();
+  const minimumLength = passwordMinimumLength();
+  const currentPassword = currentPasswordInput.value;
+  const newPassword = newPasswordInput.value;
+  const confirmPassword = confirmNewPasswordInput.value;
+
+  if (newPassword.length < minimumLength) {
+    showAlert(`Password ใหม่ต้องมีอย่างน้อย ${minimumLength} ตัวอักษร`);
+    newPasswordInput.focus();
+    return;
+  }
+  if (!/[A-Za-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+    showAlert('Password ใหม่ต้องมีทั้งตัวอักษรและตัวเลข');
+    newPasswordInput.focus();
+    return;
+  }
+  if (newPassword !== confirmPassword) {
+    showAlert('Password ใหม่และการยืนยัน Password ไม่ตรงกัน');
+    confirmNewPasswordInput.focus();
+    return;
+  }
+  if (currentPassword === newPassword) {
+    showAlert('Password ใหม่ต้องไม่ซ้ำกับ Password ปัจจุบัน');
+    newPasswordInput.focus();
+    return;
+  }
+
+  savePasswordButton.disabled = true;
+  savePasswordButton.textContent = 'กำลังเปลี่ยน…';
+  try {
+    const result = await apiRequest('changeAdminPassword', {
+      currentPassword,
+      newPassword
+    });
+    closePasswordModal();
+    clearStoredSession();
+    closeDetail();
+    showLogin();
+    showAlert(result.message || 'เปลี่ยน Password สำเร็จ กรุณา Login ใหม่');
+  } catch (error) {
+    showAlert(error.message);
+  } finally {
+    savePasswordButton.disabled = false;
+    savePasswordButton.textContent = 'บันทึก Password ใหม่';
+  }
 }
 
 function showAdmin(profile) {
@@ -438,7 +528,20 @@ function bindEvents() {
     loginPassword.type = visible ? 'password' : 'text';
     document.querySelector('#toggle-password').textContent = visible ? 'แสดง' : 'ซ่อน';
   });
+  document.querySelector('#change-password-button').addEventListener('click', openPasswordModal);
   document.querySelector('#logout-button').addEventListener('click', handleLogout);
+  document.querySelector('#close-password-modal').addEventListener('click', closePasswordModal);
+  document.querySelector('#cancel-password-change').addEventListener('click', closePasswordModal);
+  passwordModalBackdrop.addEventListener('click', closePasswordModal);
+  changePasswordForm.addEventListener('submit', handleChangePassword);
+  changePasswordForm.querySelectorAll('[data-toggle-password]').forEach(button => {
+    button.addEventListener('click', () => {
+      const input = document.querySelector(`#${button.dataset.togglePassword}`);
+      const visible = input.type === 'text';
+      input.type = visible ? 'password' : 'text';
+      button.textContent = visible ? 'แสดง' : 'ซ่อน';
+    });
+  });
   document.querySelector('#refresh-button').addEventListener('click', loadDashboard);
   document.querySelector('#filter-form').addEventListener('submit', event => {
     event.preventDefault();
@@ -451,7 +554,12 @@ function bindEvents() {
   document.querySelector('#retry-pdf-button').addEventListener('click', retryPdf);
   newStatusSelect.addEventListener('change', updateRejectReasonVisibility);
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && !detailDrawer.classList.contains('hidden')) closeDetail();
+    if (event.key !== 'Escape') return;
+    if (!passwordModal.classList.contains('hidden')) {
+      closePasswordModal();
+      return;
+    }
+    if (!detailDrawer.classList.contains('hidden')) closeDetail();
   });
 }
 

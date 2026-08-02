@@ -65,6 +65,7 @@ button { cursor: pointer; }
 .topbar { position: sticky; top: 0; z-index: 20; display: flex; justify-content: space-between; align-items: center; gap: 1rem; background: rgba(255,255,255,.96); border-bottom: 1px solid var(--border); padding: 1rem clamp(1rem, 4vw, 3rem); backdrop-filter: blur(10px); }
 .topbar h1 { margin: 0; font-size: 1.35rem; }
 .user-area { display: flex; align-items: center; gap: 1rem; text-align: right; }
+.user-actions { display: flex; align-items: center; gap: .55rem; }
 .page-container { width: min(1500px, 100%); margin: 0 auto; padding: 1.4rem clamp(1rem, 4vw, 3rem) 3rem; }
 
 .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; }
@@ -111,6 +112,18 @@ tbody tr:hover { background: #f8fbfd; }
 .timeline-item strong, .timeline-item span { display: block; }
 .timeline-item span { color: var(--muted); font-size: .82rem; }
 
+
+.modal-card {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 60;
+  width: min(92vw, 520px); max-height: 92vh; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.1rem 1.2rem; border-bottom: 1px solid var(--border); }
+.modal-head h2 { margin: 0; }
+.modal-body { display: grid; gap: 1rem; padding: 1.2rem; }
+.modal-actions { display: flex; justify-content: flex-end; gap: .7rem; padding-top: .25rem; }
+
 .toast { position: fixed; right: 1rem; bottom: 1rem; z-index: 90; background: #0f172a; color: #fff; padding: .8rem 1rem; border-radius: 10px; box-shadow: var(--shadow); }
 
 @media (max-width: 900px) {
@@ -122,6 +135,9 @@ tbody tr:hover { background: #f8fbfd; }
 @media (max-width: 620px) {
   .topbar { align-items: flex-start; }
   .user-area { align-items: flex-end; flex-direction: column; gap: .5rem; }
+  .user-actions { flex-wrap: wrap; justify-content: flex-end; }
+  .modal-actions { flex-direction: column-reverse; }
+  .modal-actions button { width: 100%; }
   .summary-grid { grid-template-columns: 1fr; }
   .filter-row, .detail-grid { grid-template-columns: 1fr; }
   .responsive-head { align-items: flex-start; }
