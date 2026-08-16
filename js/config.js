@@ -4,6 +4,6 @@ export const APP_CONFIG = Object.freeze({
   REQUEST_TIMEOUT_MS: 240000,
   AUTOSAVE_KEY: 'drug-formulary-form-draft-v1',
   SESSION_KEY: 'drug-formulary-current-submission-v1',
-  APP_VERSION: '1.1.0',
+  APP_VERSION: '1.2.0',
   ENABLE_DEBUG: false
 });

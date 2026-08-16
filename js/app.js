@@ -3,6 +3,7 @@ import { apiRequest, base64ToBlob, downloadBlob, ApiError } from './api.js';
 import { DOCUMENT_DEFINITIONS, STEP_TITLES, STATUS_LABELS } from './form-schema.js';
 import { debounce, escapeHtml, fileExtension, formatBytes, normalizeKeyPart, readFileAsBase64, setText, todayYear } from './utils.js';
 import { getUrgencyDurationState } from './physician-rules.js';
+import { findInlineTemplate } from './document-template-rules.js';
 
 const form = document.querySelector('#submission-form');
 const steps = [...document.querySelectorAll('.form-step')];
@@ -38,6 +39,7 @@ const state = {
     maximumTotalUploadMb: 35,
     acceptedExtensionsByDocumentType: {}
   },
+  publicTemplates: [],
   documentFiles: new Map(),
   researchMetadata: [],
   duplicate: { checkedKey: '', blocked: null, checking: false },
@@ -268,12 +270,23 @@ function renderDocuments() {
       ? '<span class="required-chip conditional-chip">บังคับเมื่อเป็นยานำเข้า</span>'
       : definition.required ? '<span class="required-chip">บังคับ</span>' : '';
     const accept = effectiveAccept(definition);
+    const inlineTemplate = findInlineTemplate(definition.code, state.publicTemplates);
+    const inlineTemplateButton = inlineTemplate
+      ? `<button type="button" class="secondary-button inline-template-button" data-inline-template-key="${escapeHtml(inlineTemplate.templateKey)}">ดาวน์โหลด Template</button>`
+      : '';
     card.innerHTML = `
       <div class="document-head"><div><h3 class="document-title">${escapeHtml(definition.label)}</h3><p class="document-description">${escapeHtml(definition.description)} · รองรับ ${accept.map(item => `.${item}`).join(', ')}</p></div>${requiredLabel}</div>
-      <input class="file-input" type="file" data-file-input="${definition.code}" accept="${accept.map(item => `.${item}`).join(',')}" ${definition.multiple ? 'multiple' : ''}>
+      <div class="document-upload-actions">
+        <input class="file-input" type="file" data-file-input="${definition.code}" accept="${accept.map(item => `.${item}`).join(',')}" ${definition.multiple ? 'multiple' : ''}>
+        ${inlineTemplateButton}
+      </div>
       <ul class="file-list" data-file-list="${definition.code}"></ul>
       ${definition.research ? '<div class="research-metadata" data-research-metadata></div>' : ''}`;
     card.querySelector('input[type="file"]').addEventListener('change', event => handleFileSelection(definition, event.target));
+    if (inlineTemplate) {
+      const templateButton = card.querySelector('[data-inline-template-key]');
+      templateButton?.addEventListener('click', () => downloadPublicTemplate(inlineTemplate.templateKey, templateButton));
+    }
     documentList.appendChild(card);
   });
   updateConditionalDocuments();
@@ -718,9 +731,14 @@ async function loadPublicConfiguration() {
 async function loadPublicTemplates() {
   try {
     const templates = await apiRequest('listPublicTemplates');
-    if (!Array.isArray(templates) || !templates.length) return;
+    state.publicTemplates = Array.isArray(templates) ? templates : [];
+    renderDocuments();
     publicTemplatesList.innerHTML = '';
-    templates.forEach(template => {
+    if (!state.publicTemplates.length) {
+      publicTemplatesCard.classList.add('hidden');
+      return;
+    }
+    state.publicTemplates.forEach(template => {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'template-button';
@@ -730,6 +748,8 @@ async function loadPublicTemplates() {
     });
     publicTemplatesCard.classList.remove('hidden');
   } catch (error) {
+    state.publicTemplates = [];
+    renderDocuments();
     if (APP_CONFIG.ENABLE_DEBUG) console.warn(error);
   }
 }

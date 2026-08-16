@@ -1,4 +1,4 @@
-# Drug Formulary Form App v1.1.0
+# Drug Formulary Form App v1.2.0
 
 Static Form App สำหรับบริษัทยา ใช้งานบน GitHub Pages และเชื่อม Google Apps Script Backend ด้วย `fetch()` แบบ `text/plain;charset=utf-8`
 
@@ -19,6 +19,7 @@ Static Form App สำหรับบริษัทยา ใช้งานบ
 - Submit เอกสารไป Backend และดาวน์โหลด PDF ที่สร้างจาก Template
 - ไม่เปิดให้บริษัท Upload เอกสารลงนามแล้ว; Admin เป็นผู้อัปโหลดจาก Admin App
 - ดาวน์โหลด Public Templates จาก Google Drive ผ่าน Backend
+- Step 5 แสดงปุ่ม `ดาวน์โหลด Template` ติดกับช่อง Upload ของ Patient Information Leaflet และ PowerPoint เมื่อ Template เปิดใช้งาน
 
 ## 1. ตั้งค่า Backend URL
 
@@ -45,7 +46,16 @@ API_URL: 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec'
 
 ## 3. ตั้งค่า Public Templates
 
-เปิด Sheet `PublicTemplates` แล้วกรอก `DriveFileID` และติ๊ก `IsActive=TRUE` สำหรับไฟล์ที่ต้องให้บริษัทดาวน์โหลด เช่น `PI_TEMPLATE`
+เปิด Sheet `PublicTemplates` แล้วตั้งค่าอย่างน้อย 2 รายการนี้:
+
+| TemplateKey | ใช้กับช่อง Upload | IsActive |
+|---|---|---|
+| `PI_TEMPLATE` | Patient Information Leaflet | `TRUE` |
+| `PRESENTATION_TEMPLATE` | PowerPoint นำเสนอข้อมูลยา | `TRUE` |
+
+ใส่ `DriveFileID` ของไฟล์จริงใน Google Drive และกำหนด `MimeType` ให้ตรงกับไฟล์ (`DOCX` สำหรับ PI และ `PPTX` สำหรับ PowerPoint)
+
+Form App จะซ่อนปุ่ม inline ของ Template ที่ Backend ไม่ส่งกลับมา เช่น รายการที่ยังไม่มี DriveFileID หรือยังไม่ได้เปิดใช้งาน การแก้ข้อมูลใน `PublicTemplates` ไม่ต้อง Deploy Backend หรือ Form App ใหม่
 
 ## 4. ทดสอบในเครื่อง
 

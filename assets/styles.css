@@ -115,6 +115,9 @@ input.invalid, textarea.invalid, select.invalid { border-color: var(--danger); b
 .document-description { margin: 4px 0 0; color: var(--muted); font-size: .88rem; }
 .required-chip { background: var(--danger-soft); color: var(--danger); border-radius: 999px; padding: 4px 9px; font-size: .75rem; font-weight: 800; white-space: nowrap; }
 .conditional-chip { background: var(--warning-soft); color: var(--warning); }
+.document-upload-actions { display: flex; align-items: center; gap: 10px; }
+.document-upload-actions .file-input { flex: 1 1 320px; min-width: 0; }
+.inline-template-button { flex: 0 0 auto; white-space: nowrap; }
 .file-input { padding: 9px; background: white; }
 .file-list { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
 .file-list li { display: flex; justify-content: space-between; gap: 10px; font-size: .86rem; color: #475569; }
@@ -166,4 +169,6 @@ input.invalid, textarea.invalid, select.invalid { border-color: var(--danger); b
   .form-actions button { flex: 1; }
   .action-spacer { display: none; }
   .document-head { flex-direction: column; }
+  .document-upload-actions { align-items: stretch; flex-direction: column; }
+  .inline-template-button { width: 100%; }
 }
