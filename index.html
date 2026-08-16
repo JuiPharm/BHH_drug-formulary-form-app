@@ -122,7 +122,7 @@
         </section>
 
         <section class="form-step" data-step="3">
-          <div class="section-heading"><span class="section-number">4</span><div><h2>ข้อมูลการเสนอและแพทย์</h2><p>ข้อมูลแพทย์และผู้เห็นชอบยังไม่บังคับในขั้นบริษัท Submit</p></div></div>
+          <div class="section-heading"><span class="section-number">4</span><div><h2>ข้อมูลการเสนอและแพทย์</h2><p>ข้อมูลแพทย์ผู้เสนอเป็นข้อมูลบังคับ ผู้เห็นชอบเป็น Optional</p></div></div>
           <fieldset>
             <legend>การเปรียบเทียบและราคา</legend>
             <div class="grid two-columns">
@@ -135,16 +135,16 @@
           </fieldset>
 
           <fieldset>
-            <legend>แพทย์ผู้เสนอ — Optional</legend>
+            <legend>แพทย์ผู้เสนอ — Required</legend>
             <div class="grid two-columns">
-              <label class="field"><span>ชื่อแพทย์</span><input name="physicianName"></label>
-              <label class="field"><span>คำนำหน้าวิชาชีพ</span><input name="physicianProfessionalTitle" placeholder="เช่น นพ. / พญ."></label>
-              <label class="field"><span>แผนก</span><input name="physicianDepartment"></label>
-              <label class="field"><span>สาขา</span><input name="physicianSpecialty"></label>
+              <label class="field"><span>ชื่อแพทย์ *</span><input name="physicianName" required></label>
+              <label class="field"><span>คำนำหน้าวิชาชีพ *</span><input name="physicianProfessionalTitle" placeholder="เช่น นพ. / พญ." required></label>
+              <label class="field"><span>แผนก *</span><input name="physicianDepartment" required></label>
+              <label class="field"><span>สาขา *</span><input name="physicianSpecialty" required></label>
               <label class="field"><span>เบอร์โทรศัพท์แพทย์</span><input type="tel" name="physicianPhone"></label>
-              <label class="field"><span>ความเร่งด่วน</span><select name="urgency"><option value="">ไม่ระบุ</option><option value="URGENT">เร่งด่วน</option><option value="NON_URGENT">ไม่เร่งด่วน</option></select></label>
-              <label class="field"><span>ระยะเวลาเร่งด่วน</span><input name="urgencyDuration" placeholder="เช่น ภายใน 24 ชั่วโมง"></label>
-              <label class="field full"><span>เหตุผลในการเสนอ</span><textarea name="proposalReason" rows="3"></textarea></label>
+              <label class="field"><span>ความเร่งด่วน *</span><select name="urgency" required><option value="" selected disabled>กรุณาเลือก</option><option value="URGENT">เร่งด่วน</option><option value="NON_URGENT">ไม่เร่งด่วน</option></select></label>
+              <label class="field"><span>ระยะเวลาเร่งด่วน *</span><input name="urgencyDuration" placeholder="เช่น ภายใน 24 ชั่วโมง" required></label>
+              <label class="field full"><span>เหตุผลในการเสนอ *</span><textarea name="proposalReason" rows="3" required></textarea></label>
               <div class="field full"><span>จำกัดการสั่งใช้เฉพาะแพทย์หรือไม่</span><div class="inline-options"><label><input type="radio" name="useRestrictionRequired" value="true"> ใช่</label><label><input type="radio" name="useRestrictionRequired" value="false"> ไม่ใช่</label></div></div>
               <label class="field full"><span>สาขาแพทย์ที่อนุญาตให้สั่งใช้</span><input name="restrictedSpecialty"></label>
               <label class="field full"><span>ยาที่เสนอให้ตัดออกจากบัญชี</span><textarea name="drugToRemove" rows="2"></textarea></label>

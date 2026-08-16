@@ -2,6 +2,7 @@ import { APP_CONFIG } from './config.js';
 import { apiRequest, base64ToBlob, downloadBlob, ApiError } from './api.js';
 import { DOCUMENT_DEFINITIONS, STEP_TITLES, STATUS_LABELS } from './form-schema.js';
 import { debounce, escapeHtml, fileExtension, formatBytes, normalizeKeyPart, readFileAsBase64, setText, todayYear } from './utils.js';
+import { getUrgencyDurationState } from './physician-rules.js';
 
 const form = document.querySelector('#submission-form');
 const steps = [...document.querySelectorAll('.form-step')];
@@ -56,6 +57,17 @@ function radioBoolean(name, defaultValue = null) {
   if (raw === 'true') return true;
   if (raw === 'false') return false;
   return defaultValue;
+}
+
+function applyUrgencyDurationRule() {
+  const urgencyControl = form.elements.namedItem('urgency');
+  const durationControl = form.elements.namedItem('urgencyDuration');
+  if (!urgencyControl || !durationControl) return;
+
+  const next = getUrgencyDurationState(urgencyControl.value, durationControl.value);
+  durationControl.value = next.value;
+  durationControl.readOnly = next.readOnly;
+  durationControl.setAttribute('aria-readonly', next.readOnly ? 'true' : 'false');
 }
 
 function showAlert(message, type = 'error') {
@@ -494,6 +506,7 @@ function restoreDraft() {
     });
     (draft.approvers || []).forEach(renderApprover);
     updateConditionalDocuments();
+    applyUrgencyDurationRule();
     showToast('กู้คืนแบบร่างแล้ว — กรุณาเลือกไฟล์แนบใหม่');
   } catch {
     localStorage.removeItem(APP_CONFIG.AUTOSAVE_KEY);
@@ -746,6 +759,7 @@ function clearFormForNewSubmission() {
   sessionStorage.removeItem(APP_CONFIG.SESSION_KEY);
   approversContainer.innerHTML = '';
   renderDocuments();
+  applyUrgencyDurationRule();
   successPanel.classList.add('hidden');
   form.classList.remove('hidden');
   document.querySelector('#form-actions')?.classList.remove('hidden');
@@ -763,6 +777,10 @@ function bindEvents() {
   addApproverButton.addEventListener('click', () => renderApprover());
   document.querySelectorAll('[name="brandName"], [name="strength"], [name="dosageForm"]').forEach(input => input.addEventListener('input', invalidateDuplicateCheck));
   document.querySelectorAll('[name="isImportedProduct"]').forEach(input => input.addEventListener('change', updateConditionalDocuments));
+  form.elements.namedItem('urgency')?.addEventListener('change', () => {
+    applyUrgencyDurationRule();
+    saveDraft();
+  });
   form.addEventListener('input', debounce(saveDraft, 500));
   form.addEventListener('change', debounce(saveDraft, 300));
   document.querySelector('#clear-draft-btn').addEventListener('click', () => {
@@ -781,6 +799,7 @@ async function initialize() {
   renderDocuments();
   bindEvents();
   restoreDraft();
+  applyUrgencyDurationRule();
   showStep(0);
   await loadPublicConfiguration();
   await loadPublicTemplates();
