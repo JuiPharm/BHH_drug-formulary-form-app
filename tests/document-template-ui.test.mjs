@@ -27,7 +27,15 @@ test('public template load rerenders document cards so inline buttons appear', (
   assert.match(functionSource, /renderDocuments\(\)/);
 });
 
-test('styles include responsive upload action row and inline template button', () => {
+test('styles include a prominent but theme-aligned resource panel', () => {
   assert.match(styleSource, /\.document-upload-actions\s*\{/);
-  assert.match(styleSource, /\.inline-template-button\s*\{/);
+  assert.match(styleSource, /\.document-resource-panel\s*\{/);
+  assert.match(styleSource, /\.inline-resource-button--example\s*\{/);
+  assert.match(styleSource, /var\(--primary-soft\)/);
+});
+
+test('document renderer distinguishes example downloads from templates', () => {
+  assert.match(appSource, /resource\.resourceKind === 'example'/);
+  assert.match(appSource, /document-resource-panel/);
+  assert.match(appSource, /example-chip/);
 });
