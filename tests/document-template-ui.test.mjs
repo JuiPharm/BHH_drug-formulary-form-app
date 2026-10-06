@@ -5,8 +5,8 @@ import { readFile } from 'node:fs/promises';
 const appSource = await readFile(new URL('../js/app.js', import.meta.url), 'utf8');
 const styleSource = await readFile(new URL('../assets/styles.css', import.meta.url), 'utf8');
 
-test('app imports inline template lookup helper', () => {
-  assert.match(appSource, /import \{ findInlineTemplate \} from '\.\/document-template-rules\.js';/);
+test('app imports inline resource lookup helper', () => {
+  assert.match(appSource, /import \{ findInlineResources \} from '\.\/document-template-rules\.js';/);
 });
 
 test('app state stores public templates returned by backend', () => {
@@ -14,10 +14,10 @@ test('app state stores public templates returned by backend', () => {
   assert.match(appSource, /state\.publicTemplates\s*=\s*Array\.isArray\(templates\)\s*\?\s*templates\s*:\s*\[\];/);
 });
 
-test('document renderer resolves template per document and renders inline download button', () => {
-  assert.match(appSource, /findInlineTemplate\(definition\.code, state\.publicTemplates\)/);
+test('document renderer resolves templates and examples per document', () => {
+  assert.match(appSource, /findInlineResources\(definition\.code, state\.publicTemplates\)/);
   assert.match(appSource, /data-inline-template-key=/);
-  assert.match(appSource, /ดาวน์โหลด Template/);
+  assert.match(appSource, /resource\.actionLabel/);
 });
 
 test('public template load rerenders document cards so inline buttons appear', () => {
