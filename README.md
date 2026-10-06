@@ -1,4 +1,4 @@
-# Drug Formulary Form App v1.2.0
+# Drug Formulary Form App v1.3.0
 
 Static Form App สำหรับบริษัทยา ใช้งานบน GitHub Pages และเชื่อม Google Apps Script Backend ด้วย `fetch()` แบบ `text/plain;charset=utf-8`
 
@@ -10,7 +10,7 @@ Static Form App สำหรับบริษัทยา ใช้งานบ
 - ข้อมูลบริษัทและผู้แทน พร้อม E-mail/โทรศัพท์บังคับ
 - ข้อมูลผลิตภัณฑ์และ Clinical Pharmacology ตามแบบฟอร์ม PTC
 - ข้อมูลแพทย์ผู้เสนอเป็น Required ยกเว้นเบอร์โทรแพทย์เป็น Optional
-- เมื่อเลือกไม่เร่งด่วน ระบบเติม `รอบการนำเสนอของคณะกรรมการ PTC` และล็อกช่องระยะเวลาให้อัตโนมัติ
+- เมื่อเลือกเร่งด่วน ระบบใช้จำนวน + หน่วย (ชั่วโมง/วัน) เพื่อสร้างค่าระยะเวลาแบบมาตรฐาน; เมื่อเลือกไม่เร่งด่วน ระบบเติม `รอบการนำเสนอของคณะกรรมการ PTC` อัตโนมัติ
 - ผู้เห็นชอบ 0–6 คนแบบ Optional
 - Dynamic Certificate of Free Sale เมื่อเป็นผลิตภัณฑ์นำเข้า
 - งานวิจัย 1–3 ฉบับ พร้อม metadata และเหตุผลเมื่อเก่ากว่า 5 ปี
@@ -19,7 +19,11 @@ Static Form App สำหรับบริษัทยา ใช้งานบ
 - Submit เอกสารไป Backend และดาวน์โหลด PDF ที่สร้างจาก Template
 - ไม่เปิดให้บริษัท Upload เอกสารลงนามแล้ว; Admin เป็นผู้อัปโหลดจาก Admin App
 - ดาวน์โหลด Public Templates จาก Google Drive ผ่าน Backend
-- Step 5 แสดงปุ่ม `ดาวน์โหลด Template` ติดกับช่อง Upload ของ Patient Information Leaflet และ PowerPoint เมื่อ Template เปิดใช้งาน
+- Step 5 แสดงปุ่มดาวน์โหลด Template/ตัวอย่างติดกับช่อง Upload ของ Patient Information Leaflet และ PowerPoint ตามรายการที่เปิดใช้งานใน `PublicTemplates`
+- เหตุผลในการเสนอใช้ตัวเลือกตามแบบฟอร์ม PTC พร้อมรายละเอียดแบบมีเงื่อนไข
+- การจำกัดสิทธิ์แพทย์เป็นข้อมูลบังคับ และบังคับระบุสาขาเมื่อเลือกจำกัด
+- เพิ่ม Clinical Pharmacology 6.13 `Other Clinical Information`
+- Step 6 แสดงเงื่อนไขสำคัญและ checklist ก่อน Submit
 
 ## 1. ตั้งค่า Backend URL
 
@@ -101,3 +105,15 @@ https://juipharm.github.io/BHH_drug-formulary-form-app/admin/
 ## Admin App v1.1.0
 
 เมนู `เปลี่ยน Password` ต้องใช้ Backend v1.3.1 และ `ADMIN_PASSWORD_MIN_LENGTH = 8` หลังเปลี่ยนสำเร็จ ผู้ใช้ต้อง Login ใหม่
+
+
+## Public Examples (v1.3.0)
+
+รองรับ Resource keys เพิ่มเติมใน `PublicTemplates`:
+
+| TemplateKey | ใช้กับช่อง Upload | จุดประสงค์ |
+|---|---|---|
+| `PI_EXAMPLE` | Patient Information Leaflet | ดาวน์โหลดตัวอย่าง PI |
+| `PRESENTATION_EXAMPLE` | PowerPoint นำเสนอข้อมูลยา | ดาวน์โหลดตัวอย่าง Slide |
+
+Resource ตัวอย่างแยกจาก `PI_TEMPLATE` / `PRESENTATION_TEMPLATE` เพื่อไม่ให้ไฟล์ตัวอย่างไปแทนที่ Template สำหรับกรอกข้อมูลจริง
