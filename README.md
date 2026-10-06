@@ -121,3 +121,12 @@ Resource ตัวอย่างแยกจาก `PI_TEMPLATE` / `PRESENTATIO
 ใน v1.3.3 Step 5 แสดง resource panel แยกจากช่อง Upload โดยเน้นไฟล์ตัวอย่างด้วย visual hierarchy ที่ใช้สีและ token เดิมของ Theme (`--primary`, `--primary-soft`, `--border`) พร้อม badge `ตัวอย่าง` เพื่อให้ผู้ใช้เห็นและดาวน์โหลดก่อนจัดเตรียมไฟล์ได้ชัดเจนขึ้น
 
 ตัวอย่าง PI ปัจจุบันคือ `PI_Ryaltris.docx` และตัวอย่าง Slide เป็น PowerPoint ที่เปิดใช้งานผ่าน `PRESENTATION_EXAMPLE`.
+
+## Backend source (Google Apps Script)
+
+Backend source is version-controlled under `backend/apps-script/`.
+
+The current backend snapshot is **v1.3.3** and is designed to work with Form App v1.3.3 and
+`FM-02.2-PTC-004 Rev.13 (11/07/2024)`. Environment-specific Script Properties, credentials,
+tokens, and production settings are intentionally not stored in Git.
+
