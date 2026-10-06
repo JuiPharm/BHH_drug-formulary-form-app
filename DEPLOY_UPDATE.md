@@ -1,32 +1,43 @@
-# Deploy Form App Update v1.2.0
+# Deploy Form App Update v1.3.0
 
 ## What changed
 
-Step 5 `เอกสารประกอบ` เพิ่มปุ่ม `ดาวน์โหลด Template` ติดกับช่อง Upload โดยตรงสำหรับ:
+Form App v1.3.0 ปรับข้อมูลให้สอดคล้องกับ PTC-004 Rev.13 และ workflow ฝ่ายเภสัชกรรม:
 
-- `PATIENT_INFORMATION_LEAFLET` → `PI_TEMPLATE`
-- `PRESENTATION` → `PRESENTATION_TEMPLATE`
+- ใช้คำว่า `RMP` ใน Form และ PDF Template
+- ความเร่งด่วนแบบเร่งด่วนใช้จำนวน + หน่วย `ชั่วโมง/วัน` และสร้าง `urgencyDuration` อัตโนมัติ
+- เหตุผลในการเสนอเป็นตัวเลือกตามแบบฟอร์ม พร้อมรายละเอียดแบบมีเงื่อนไข และรวมกลับลง `proposalReason` เพื่อรองรับ Backend เดิม
+- บังคับเลือกการจำกัดสิทธิ์แพทย์ และบังคับ Specialty เมื่อเลือกจำกัด
+- เพิ่ม Clinical Pharmacology 6.13 `OtherClinicalInformation`
+- เพิ่มเงื่อนไขสำคัญและ checklist ก่อน Submit
+- รองรับปุ่มดาวน์โหลดตัวอย่าง PI และ Slide Presentation ติดกับช่อง Upload
 
-ปุ่มจะแสดงเฉพาะเมื่อ Backend `listPublicTemplates` ส่ง Template key นั้นกลับมา หาก Template ยังไม่ Active หรือยังไม่มี DriveFileID ช่อง Upload ยังคงทำงานแต่ปุ่ม Download จะไม่แสดง
+## PublicTemplates
 
-Public Templates card เดิมยังคงอยู่และใช้ download action เดียวกัน
+เพิ่ม Resource keys ต่อไปนี้ใน Sheet `PublicTemplates` และตั้ง `IsActive = TRUE`:
 
-## PublicTemplates Sheet
+| TemplateKey | ใช้กับ | รูปแบบ |
+|---|---|---|
+| `PI_EXAMPLE` | Patient Information Leaflet | PDF |
+| `PRESENTATION_EXAMPLE` | PowerPoint นำเสนอข้อมูลยา | PPTX |
 
-ตรวจ/เพิ่มข้อมูลใน Google Sheet `PublicTemplates`:
+ตัวอย่างถูกแยกจาก `PI_TEMPLATE` และ `PRESENTATION_TEMPLATE` เพื่อให้สามารถเปลี่ยน Template สำหรับกรอกจริงได้โดยไม่กระทบตัวอย่าง
 
-| TemplateKey | DisplayName | MimeType | IsActive | DisplayOrder |
-|---|---|---|---|---:|
-| `PI_TEMPLATE` | Template Patient Information Leaflet (PI) | `application/vnd.openxmlformats-officedocument.wordprocessingml.document` | `TRUE` | 1 |
-| `PRESENTATION_TEMPLATE` | Template PowerPoint นำเสนอข้อมูลยา | `application/vnd.openxmlformats-officedocument.presentationml.presentation` | `TRUE` | 2 |
+## Database / PDF Template
 
-ใส่ `DriveFileID` ของไฟล์ Word/PPTX จริงในแต่ละแถวด้วย
+- `SystemSettings.DOCUMENT_REVISION` = `Rev.13 (11/07/2024)`
+- `ProductDetails` เพิ่ม column `OtherClinicalInformation`
+- Active PDF Template เปลี่ยนคำว่า SMP เป็น RMP
+- หัวข้อ 6.13 ใช้ placeholder `{{OtherClinicalInformation}}`
+- ส่วนเหตุผลในการเสนอใช้ `{{ProposalReason}}`
 
 ## Deploy
 
-1. Upload/replace contents of this release in the existing GitHub repository root.
-2. Keep `js/config.js` `API_URL` pointed at the current Apps Script `/exec` deployment.
-3. Push to `main` and wait for GitHub Pages workflow.
-4. Backend ไม่ต้อง redeploy สำหรับ update นี้.
-5. เปิด Form App และเข้า Step 5 ทดสอบว่า PI และ PowerPoint มีปุ่ม `ดาวน์โหลด Template` เมื่อ Sheet ตั้งค่าครบ.
-6. ถ้ายังเห็นหน้าเก่า ให้ hard refresh หลัง GitHub Pages deploy เสร็จ.
+1. Merge branch เข้า `main`
+2. รอ GitHub Pages workflow deploy สำเร็จ
+3. Hard refresh Form App
+4. ตรวจ Step 3, Step 4, Step 5 และ Step 6
+5. ทดสอบดาวน์โหลด `PI_EXAMPLE` และ `PRESENTATION_EXAMPLE`
+6. ทำ test submission 1 รายการก่อนเปิดใช้งานจริง เพื่อยืนยันว่า Backend ที่ deploy อยู่บันทึก `OtherClinicalInformation` และ merge ลง PDF ได้ครบ
+
+> หมายเหตุ: field เดิม เช่น `proposalReason` และ `urgencyDuration` ยังคงถูกส่งต่อเพื่อ backward compatibility
