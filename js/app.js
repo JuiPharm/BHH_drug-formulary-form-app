@@ -839,51 +839,65 @@ async function downloadGeneratedPdf() {
   }
 }
 
-async function loadPublicConfiguration() {
-  try {
-    const config = await apiRequest('getPublicConfig');
-    state.publicConfig = { ...state.publicConfig, ...config };
-    setText(document.querySelector('#app-title'), config.appName || 'ระบบเสนอยาเข้าบัญชียา');
-    setText(document.querySelector('#hospital-name'), config.hospitalName || 'โรงพยาบาลกรุงเทพหาดใหญ่');
-    setText(document.querySelector('#footer-system-info'), `${config.documentFormCode || ''} ${config.documentRevision || ''} · Form App v${APP_CONFIG.APP_VERSION}`);
-    systemStatus.textContent = 'ระบบพร้อมใช้งาน';
-    systemStatus.className = 'system-pill ready';
-    uploadLimitText.textContent = `สูงสุด ${state.publicConfig.maximumFileSizeMb} MB ต่อไฟล์ และ ${state.publicConfig.maximumTotalUploadMb} MB ต่อคำขอ`;
-    renderDocuments();
-    resequenceApprovers();
-  } catch (error) {
+function applyPublicConfiguration(config) {
+  state.publicConfig = { ...state.publicConfig, ...config };
+  setText(document.querySelector('#app-title'), config.appName || 'ระบบเสนอยาเข้าบัญชียา');
+  setText(document.querySelector('#hospital-name'), config.hospitalName || 'โรงพยาบาลกรุงเทพหาดใหญ่');
+  setText(document.querySelector('#footer-system-info'), `${config.documentFormCode || ''} ${config.documentRevision || ''} · Form App v${APP_CONFIG.APP_VERSION}`);
+  systemStatus.textContent = 'ระบบพร้อมใช้งาน';
+  systemStatus.className = 'system-pill ready';
+  uploadLimitText.textContent = `สูงสุด ${state.publicConfig.maximumFileSizeMb} MB ต่อไฟล์ และ ${state.publicConfig.maximumTotalUploadMb} MB ต่อคำขอ`;
+}
+
+function renderPublicTemplatesSidebar() {
+  publicTemplatesList.innerHTML = '';
+  if (!state.publicTemplates.length) {
+    publicTemplatesCard.classList.add('hidden');
+    return;
+  }
+
+  state.publicTemplates.forEach(template => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'template-button';
+    button.innerHTML = `${escapeHtml(template.displayName)}<small>${escapeHtml(template.description || '')}</small>`;
+    button.addEventListener('click', () => downloadPublicTemplate(template.templateKey, button));
+    publicTemplatesList.appendChild(button);
+  });
+  publicTemplatesCard.classList.remove('hidden');
+}
+
+async function loadInitialPublicData() {
+  // Start both backend requests together. Step 5 is rendered only after both
+  // requests settle, so document cards and their example/template actions
+  // appear in the same paint instead of examples arriving later.
+  const configPromise = apiRequest('getPublicConfig');
+  const templatesPromise = apiRequest('listPublicTemplates');
+
+  const [configResult, templatesResult] = await Promise.allSettled([
+    configPromise,
+    templatesPromise
+  ]);
+
+  if (configResult.status === 'fulfilled') {
+    applyPublicConfiguration(configResult.value);
+  } else {
     systemStatus.textContent = 'เชื่อมต่อ Backend ไม่สำเร็จ';
     systemStatus.className = 'system-pill error';
     uploadLimitText.textContent = 'ไม่สามารถโหลดข้อจำกัดจาก Backend ได้';
-    renderDocuments();
-    showAlert(error.message);
+    showAlert(configResult.reason?.message || 'ไม่สามารถโหลดการตั้งค่าระบบได้');
   }
-}
 
-async function loadPublicTemplates() {
-  try {
-    const templates = await apiRequest('listPublicTemplates');
-    state.publicTemplates = Array.isArray(templates) ? templates : [];
-    renderDocuments();
-    publicTemplatesList.innerHTML = '';
-    if (!state.publicTemplates.length) {
-      publicTemplatesCard.classList.add('hidden');
-      return;
-    }
-    state.publicTemplates.forEach(template => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'template-button';
-      button.innerHTML = `${escapeHtml(template.displayName)}<small>${escapeHtml(template.description || '')}</small>`;
-      button.addEventListener('click', () => downloadPublicTemplate(template.templateKey, button));
-      publicTemplatesList.appendChild(button);
-    });
-    publicTemplatesCard.classList.remove('hidden');
-  } catch (error) {
+  if (templatesResult.status === 'fulfilled') {
+    state.publicTemplates = Array.isArray(templatesResult.value) ? templatesResult.value : [];
+  } else {
     state.publicTemplates = [];
-    renderDocuments();
-    if (APP_CONFIG.ENABLE_DEBUG) console.warn(error);
+    if (APP_CONFIG.ENABLE_DEBUG) console.warn(templatesResult.reason);
   }
+
+  renderPublicTemplatesSidebar();
+  renderDocuments();
+  resequenceApprovers();
 }
 
 async function downloadPublicTemplate(templateKey, button) {
@@ -958,16 +972,18 @@ function bindEvents() {
 }
 
 async function initialize() {
+  // Kick off public metadata immediately while the local UI is being prepared.
+  const publicDataPromise = loadInitialPublicData();
+
   renderStepper();
-  renderDocuments();
   bindEvents();
   restoreDraft();
   applyUrgencyDurationRule();
   updateProposalReasonRules();
   updateRestrictionRule();
   showStep(0);
-  await loadPublicConfiguration();
-  await loadPublicTemplates();
+
+  await publicDataPromise;
 }
 
 initialize();
