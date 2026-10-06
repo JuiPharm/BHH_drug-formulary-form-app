@@ -39,3 +39,23 @@ test('document renderer distinguishes example downloads from templates', () => {
   assert.match(appSource, /document-resource-panel/);
   assert.match(appSource, /example-chip/);
 });
+
+
+test('initial public data loads config and templates concurrently and renders documents once', () => {
+  const functionStart = appSource.indexOf('async function loadInitialPublicData()');
+  const functionEnd = appSource.indexOf('async function downloadPublicTemplate', functionStart);
+  const functionSource = appSource.slice(functionStart, functionEnd);
+  assert.match(functionSource, /apiRequest\('getPublicConfig'\)/);
+  assert.match(functionSource, /apiRequest\('listPublicTemplates'\)/);
+  assert.match(functionSource, /Promise\.allSettled/);
+  assert.equal((functionSource.match(/renderDocuments\(\)/g) || []).length, 1);
+});
+
+test('initialize starts public loading before local UI preparation', () => {
+  const functionStart = appSource.indexOf('async function initialize()');
+  const functionSource = appSource.slice(functionStart);
+  const loadIndex = functionSource.indexOf('const publicDataPromise = loadInitialPublicData()');
+  const stepperIndex = functionSource.indexOf('renderStepper()');
+  assert.ok(loadIndex >= 0 && stepperIndex >= 0 && loadIndex < stepperIndex);
+  assert.match(functionSource, /await publicDataPromise/);
+});
