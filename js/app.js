@@ -345,14 +345,34 @@ function renderDocuments() {
     const accept = effectiveAccept(definition);
     const inlineResources = findInlineResources(definition.code, state.publicTemplates);
     const inlineResourceButtons = inlineResources
-      .map(resource => `<button type="button" class="secondary-button inline-template-button" data-inline-template-key="${escapeHtml(resource.templateKey)}">${escapeHtml(resource.actionLabel)}</button>`)
+      .map(resource => {
+        const isExample = resource.resourceKind === 'example';
+        const helperText = resource.helperText || resource.displayName || '';
+        return `<button type="button" class="inline-template-button inline-resource-button ${isExample ? 'inline-resource-button--example' : 'inline-resource-button--template'}" data-inline-template-key="${escapeHtml(resource.templateKey)}">
+          <span class="inline-resource-icon" aria-hidden="true">${isExample ? '↓' : '▣'}</span>
+          <span class="inline-resource-copy">
+            <strong>${escapeHtml(resource.actionLabel)}</strong>
+            <small>${escapeHtml(helperText)}</small>
+          </span>
+          ${isExample ? '<span class="example-chip">ตัวอย่าง</span>' : ''}
+        </button>`;
+      })
       .join('');
+    const inlineResourcePanel = inlineResources.length
+      ? `<div class="document-resource-panel">
+          <div class="document-resource-heading">
+            <strong>ไฟล์ตัวอย่างและ Template</strong>
+            <span>ดาวน์โหลดเพื่อดูรูปแบบก่อนจัดเตรียมไฟล์ Upload</span>
+          </div>
+          <div class="document-resource-list">${inlineResourceButtons}</div>
+        </div>`
+      : '';
     card.innerHTML = `
       <div class="document-head"><div><h3 class="document-title">${escapeHtml(definition.label)}</h3><p class="document-description">${escapeHtml(definition.description)} · รองรับ ${accept.map(item => `.${item}`).join(', ')}</p></div>${requiredLabel}</div>
       <div class="document-upload-actions">
         <input class="file-input" type="file" data-file-input="${definition.code}" accept="${accept.map(item => `.${item}`).join(',')}" ${definition.multiple ? 'multiple' : ''}>
-        ${inlineResourceButtons}
       </div>
+      ${inlineResourcePanel}
       <ul class="file-list" data-file-list="${definition.code}"></ul>
       ${definition.research ? '<div class="research-metadata" data-research-metadata></div>' : ''}`;
     card.querySelector('input[type="file"]').addEventListener('change', event => handleFileSelection(definition, event.target));

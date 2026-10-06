@@ -1,4 +1,4 @@
-# Drug Formulary Form App v1.3.0
+# Drug Formulary Form App v1.3.3
 
 Static Form App สำหรับบริษัทยา ใช้งานบน GitHub Pages และเชื่อม Google Apps Script Backend ด้วย `fetch()` แบบ `text/plain;charset=utf-8`
 
@@ -107,13 +107,17 @@ https://juipharm.github.io/BHH_drug-formulary-form-app/admin/
 เมนู `เปลี่ยน Password` ต้องใช้ Backend v1.3.1 และ `ADMIN_PASSWORD_MIN_LENGTH = 8` หลังเปลี่ยนสำเร็จ ผู้ใช้ต้อง Login ใหม่
 
 
-## Public Examples (v1.3.0)
+## Public Examples (v1.3.3)
 
 รองรับ Resource keys เพิ่มเติมใน `PublicTemplates`:
 
 | TemplateKey | ใช้กับช่อง Upload | จุดประสงค์ |
 |---|---|---|
-| `PI_EXAMPLE` | Patient Information Leaflet | ดาวน์โหลดตัวอย่าง PI |
+| `PI_EXAMPLE` | Patient Information Leaflet | ดาวน์โหลดตัวอย่าง PI Ryaltris (DOCX) |
 | `PRESENTATION_EXAMPLE` | PowerPoint นำเสนอข้อมูลยา | ดาวน์โหลดตัวอย่าง Slide |
 
 Resource ตัวอย่างแยกจาก `PI_TEMPLATE` / `PRESENTATION_TEMPLATE` เพื่อไม่ให้ไฟล์ตัวอย่างไปแทนที่ Template สำหรับกรอกข้อมูลจริง
+
+ใน v1.3.3 Step 5 แสดง resource panel แยกจากช่อง Upload โดยเน้นไฟล์ตัวอย่างด้วย visual hierarchy ที่ใช้สีและ token เดิมของ Theme (`--primary`, `--primary-soft`, `--border`) พร้อม badge `ตัวอย่าง` เพื่อให้ผู้ใช้เห็นและดาวน์โหลดก่อนจัดเตรียมไฟล์ได้ชัดเจนขึ้น
+
+ตัวอย่าง PI ปัจจุบันคือ `PI_Ryaltris.docx` และตัวอย่าง Slide เป็น PowerPoint ที่เปิดใช้งานผ่าน `PRESENTATION_EXAMPLE`.

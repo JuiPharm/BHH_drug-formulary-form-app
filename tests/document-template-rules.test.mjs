@@ -39,6 +39,8 @@ test('returns PI template and example resources when both are active', () => {
   assert.equal(resources.length, 2);
   assert.equal(resources[0].actionLabel, 'ดาวน์โหลด Template');
   assert.equal(resources[1].actionLabel, 'ดาวน์โหลดตัวอย่าง PI');
+  assert.equal(resources[1].resourceKind, 'example');
+  assert.match(resources[1].helperText, /Ryaltris/);
 });
 
 test('returns presentation example without requiring a presentation template', () => {
@@ -49,4 +51,6 @@ test('returns presentation example without requiring a presentation template', (
   assert.equal(resources.length, 1);
   assert.equal(resources[0].templateKey, 'PRESENTATION_EXAMPLE');
   assert.equal(resources[0].actionLabel, 'ดาวน์โหลดตัวอย่าง Slide');
+  assert.equal(resources[0].resourceKind, 'example');
+  assert.match(resources[0].helperText, /Slide Presentation/);
 });
