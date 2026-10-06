@@ -11,7 +11,7 @@ test('app imports inline resource lookup helper', () => {
 
 test('app state stores public templates returned by backend', () => {
   assert.match(appSource, /publicTemplates:\s*\[\]/);
-  assert.match(appSource, /state\.publicTemplates\s*=\s*Array\.isArray\(templates\)\s*\?\s*templates\s*:\s*\[\];/);
+  assert.match(appSource, /state\.publicTemplates\s*=\s*Array\.isArray\(templatesResult\.value\)\s*\?\s*templatesResult\.value\s*:\s*\[\];/);
 });
 
 test('document renderer resolves templates and examples per document', () => {
@@ -20,11 +20,17 @@ test('document renderer resolves templates and examples per document', () => {
   assert.match(appSource, /resource\.actionLabel/);
 });
 
-test('public template load rerenders document cards so inline buttons appear', () => {
-  const functionStart = appSource.indexOf('async function loadPublicTemplates()');
+test('public data loads config and templates concurrently and renders document cards once', () => {
+  const functionStart = appSource.indexOf('async function loadInitialPublicData()');
   const functionEnd = appSource.indexOf('async function downloadPublicTemplate', functionStart);
   const functionSource = appSource.slice(functionStart, functionEnd);
-  assert.match(functionSource, /renderDocuments\(\)/);
+  assert.match(functionSource, /apiRequest\('getPublicConfig'\)/);
+  assert.match(functionSource, /apiRequest\('listPublicTemplates'\)/);
+  assert.match(functionSource, /Promise\.allSettled/);
+  assert.equal((functionSource.match(/renderDocuments\(\)/g) || []).length, 1);
+  const templateAssignmentIndex = functionSource.indexOf('state.publicTemplates =');
+  const renderIndex = functionSource.indexOf('renderDocuments()');
+  assert.ok(templateAssignmentIndex >= 0 && renderIndex > templateAssignmentIndex);
 });
 
 test('styles include a prominent but theme-aligned resource panel', () => {
@@ -38,4 +44,14 @@ test('document renderer distinguishes example downloads from templates', () => {
   assert.match(appSource, /resource\.resourceKind === 'example'/);
   assert.match(appSource, /document-resource-panel/);
   assert.match(appSource, /example-chip/);
+});
+
+
+test('initialize starts public metadata loading before local UI setup', () => {
+  const functionStart = appSource.indexOf('async function initialize()');
+  const functionSource = appSource.slice(functionStart);
+  const loadIndex = functionSource.indexOf('const publicDataPromise = loadInitialPublicData()');
+  const stepperIndex = functionSource.indexOf('renderStepper()');
+  assert.ok(loadIndex >= 0 && stepperIndex >= 0 && loadIndex < stepperIndex);
+  assert.match(functionSource, /await publicDataPromise/);
 });
