@@ -30,3 +30,5 @@ assert.equal(buildUrgencyDuration('URGENT', '24', 'HOURS'), 'ภายใน 24 
 assert.equal(buildUrgencyDuration('URGENT', '2', 'DAYS'), 'ภายใน 2 วัน');
 assert.equal(buildUrgencyDuration('NON_URGENT', '', 'HOURS'), NON_URGENT_PTC_DURATION);
 assert.equal(buildUrgencyDuration('URGENT', '', 'HOURS'), '');
+
+console.log('physician-rules.test.mjs: PASS');
