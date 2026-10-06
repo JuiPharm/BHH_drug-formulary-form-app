@@ -172,3 +172,51 @@ input.invalid, textarea.invalid, select.invalid { border-color: var(--danger); b
   .document-upload-actions { align-items: stretch; flex-direction: column; }
   .inline-template-button { width: 100%; }
 }
+
+
+/* Form v1.3 structured proposal + submission terms */
+.stacked-options {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 0.5rem;
+}
+
+.stacked-options > label:not(.conditional-detail) {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  line-height: 1.45;
+}
+
+.conditional-detail {
+  margin-left: 1.8rem;
+}
+
+.urgent-duration-fields {
+  margin: 0.45rem 0 0.6rem;
+}
+
+.terms-card {
+  margin: 1.25rem 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border-color, #d8dee8);
+  border-radius: 12px;
+  background: var(--surface-soft, #f8fafc);
+}
+
+.terms-card h3 {
+  margin-top: 0;
+}
+
+.terms-card ul {
+  margin: 0.65rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.terms-card li + li {
+  margin-top: 0.45rem;
+}
+
+.document-upload-actions {
+  flex-wrap: wrap;
+}
