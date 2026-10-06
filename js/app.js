@@ -2,8 +2,8 @@ import { APP_CONFIG } from './config.js';
 import { apiRequest, base64ToBlob, downloadBlob, ApiError } from './api.js';
 import { DOCUMENT_DEFINITIONS, STEP_TITLES, STATUS_LABELS } from './form-schema.js';
 import { debounce, escapeHtml, fileExtension, formatBytes, normalizeKeyPart, readFileAsBase64, setText, todayYear } from './utils.js';
-import { getUrgencyDurationState } from './physician-rules.js';
-import { findInlineTemplate } from './document-template-rules.js';
+import { buildUrgencyDuration } from './physician-rules.js';
+import { findInlineResources } from './document-template-rules.js';
 
 const form = document.querySelector('#submission-form');
 const steps = [...document.querySelectorAll('.form-step')];
@@ -61,15 +61,79 @@ function radioBoolean(name, defaultValue = null) {
   return defaultValue;
 }
 
+function checked(name) {
+  return Boolean(form.elements.namedItem(name)?.checked);
+}
+
 function applyUrgencyDurationRule() {
   const urgencyControl = form.elements.namedItem('urgency');
+  const amountControl = form.elements.namedItem('urgencyAmount');
+  const unitControl = form.elements.namedItem('urgencyUnit');
   const durationControl = form.elements.namedItem('urgencyDuration');
   if (!urgencyControl || !durationControl) return;
 
-  const next = getUrgencyDurationState(urgencyControl.value, durationControl.value);
-  durationControl.value = next.value;
-  durationControl.readOnly = next.readOnly;
-  durationControl.setAttribute('aria-readonly', next.readOnly ? 'true' : 'false');
+  const urgent = urgencyControl.value === 'URGENT';
+  document.querySelector('.urgent-duration-fields')?.classList.toggle('hidden', !urgent);
+  if (amountControl) amountControl.required = urgent;
+  if (unitControl) unitControl.required = urgent;
+
+  durationControl.value = buildUrgencyDuration(
+    urgencyControl.value,
+    amountControl?.value || '',
+    unitControl?.value || 'HOURS'
+  );
+  durationControl.readOnly = true;
+  durationControl.setAttribute('aria-readonly', 'true');
+}
+
+function syncProposalReason() {
+  const parts = [];
+  if (checked('proposalReasonNoAlternative')) {
+    parts.push('ไม่มียาอื่นในเภสัชตำรับที่ใช้ในข้อบ่งใช้นี้');
+  }
+  if (checked('proposalReasonSafer')) {
+    const detail = value('proposalReasonSafetyDetail');
+    parts.push(`มีความปลอดภัยมากกว่ายาที่มีอยู่เดิม${detail ? `ในด้าน ${detail}` : ''}`);
+  }
+  if (checked('proposalReasonCostEffective')) {
+    const drug = value('proposalReasonComparisonDrug');
+    parts.push(`มีประสิทธิภาพและราคาคุ้มค่ากว่า${drug ? `ยา ${drug}` : 'ยาที่มีอยู่เดิม'}`);
+  }
+  if (checked('proposalReasonOther')) {
+    const detail = value('proposalReasonOtherDetail');
+    parts.push(detail ? `เหตุผลอื่น: ${detail}` : 'เหตุผลอื่น');
+  }
+  const control = form.elements.namedItem('proposalReason');
+  if (control) control.value = parts.join('\n');
+  return parts;
+}
+
+function updateProposalReasonRules() {
+  const safer = checked('proposalReasonSafer');
+  const cost = checked('proposalReasonCostEffective');
+  const other = checked('proposalReasonOther');
+  const rules = [
+    ['safer', 'proposalReasonSafetyDetail', safer],
+    ['cost', 'proposalReasonComparisonDrug', cost],
+    ['other', 'proposalReasonOtherDetail', other]
+  ];
+  rules.forEach(([detailKey, fieldName, active]) => {
+    document.querySelector(`[data-proposal-detail="${detailKey}"]`)?.classList.toggle('hidden', !active);
+    const control = form.elements.namedItem(fieldName);
+    if (control) control.required = active;
+  });
+  syncProposalReason();
+}
+
+function updateRestrictionRule() {
+  const restricted = radioBoolean('useRestrictionRequired', false) === true;
+  const wrapper = document.querySelector('.restriction-specialty-field');
+  const control = form.elements.namedItem('restrictedSpecialty');
+  wrapper?.classList.toggle('conditional-hidden', !restricted);
+  if (control) {
+    control.required = restricted;
+    if (!restricted) control.value = '';
+  }
 }
 
 function showAlert(message, type = 'error') {
@@ -196,6 +260,15 @@ function validateContainer(container) {
 }
 
 async function validateStep(index) {
+  if (index === 3) {
+    applyUrgencyDurationRule();
+    updateProposalReasonRules();
+    updateRestrictionRule();
+    if (!syncProposalReason().length) {
+      showAlert('กรุณาเลือกเหตุผลในการเสนออย่างน้อย 1 ข้อ');
+      return false;
+    }
+  }
   if (!validateContainer(steps[index])) return false;
   if (index === 1) {
     if (state.duplicate.checkedKey !== currentProductKey() || state.duplicate.blocked !== false) {
@@ -270,23 +343,22 @@ function renderDocuments() {
       ? '<span class="required-chip conditional-chip">บังคับเมื่อเป็นยานำเข้า</span>'
       : definition.required ? '<span class="required-chip">บังคับ</span>' : '';
     const accept = effectiveAccept(definition);
-    const inlineTemplate = findInlineTemplate(definition.code, state.publicTemplates);
-    const inlineTemplateButton = inlineTemplate
-      ? `<button type="button" class="secondary-button inline-template-button" data-inline-template-key="${escapeHtml(inlineTemplate.templateKey)}">ดาวน์โหลด Template</button>`
-      : '';
+    const inlineResources = findInlineResources(definition.code, state.publicTemplates);
+    const inlineResourceButtons = inlineResources
+      .map(resource => `<button type="button" class="secondary-button inline-template-button" data-inline-template-key="${escapeHtml(resource.templateKey)}">${escapeHtml(resource.actionLabel)}</button>`)
+      .join('');
     card.innerHTML = `
       <div class="document-head"><div><h3 class="document-title">${escapeHtml(definition.label)}</h3><p class="document-description">${escapeHtml(definition.description)} · รองรับ ${accept.map(item => `.${item}`).join(', ')}</p></div>${requiredLabel}</div>
       <div class="document-upload-actions">
         <input class="file-input" type="file" data-file-input="${definition.code}" accept="${accept.map(item => `.${item}`).join(',')}" ${definition.multiple ? 'multiple' : ''}>
-        ${inlineTemplateButton}
+        ${inlineResourceButtons}
       </div>
       <ul class="file-list" data-file-list="${definition.code}"></ul>
       ${definition.research ? '<div class="research-metadata" data-research-metadata></div>' : ''}`;
     card.querySelector('input[type="file"]').addEventListener('change', event => handleFileSelection(definition, event.target));
-    if (inlineTemplate) {
-      const templateButton = card.querySelector('[data-inline-template-key]');
-      templateButton?.addEventListener('click', () => downloadPublicTemplate(inlineTemplate.templateKey, templateButton));
-    }
+    card.querySelectorAll('[data-inline-template-key]').forEach(templateButton => {
+      templateButton.addEventListener('click', () => downloadPublicTemplate(templateButton.dataset.inlineTemplateKey, templateButton));
+    });
     documentList.appendChild(card);
   });
   updateConditionalDocuments();
@@ -429,6 +501,19 @@ function validateDocuments() {
   return true;
 }
 
+function validateDocumentsSilently() {
+  const imported = radioBoolean('isImportedProduct', false);
+  for (const definition of DOCUMENT_DEFINITIONS) {
+    if (definition.conditionalImport && !imported) continue;
+    const files = state.documentFiles.get(definition.code) || [];
+    if (definition.required && !files.length) return false;
+    if (definition.minFiles && files.length < definition.minFiles) return false;
+    if (definition.maxFiles && files.length > definition.maxFiles) return false;
+  }
+  const total = [...state.documentFiles.values()].flat().reduce((sum, file) => sum + file.size, 0);
+  return total <= Number(state.publicConfig.maximumTotalUploadMb) * 1024 * 1024;
+}
+
 function collectResearchMetadata() {
   return [...documentList.querySelectorAll('.research-card')].map(card => {
     const get = field => String(card.querySelector(`[data-research-field="${field}"]`)?.value || '').trim();
@@ -478,7 +563,20 @@ function renderReview() {
       reviewItem('ผู้ผลิต / ประเทศ', `${value('manufacturerName')} / ${value('countryOfManufacture')}`),
       reviewItem('RMP', radioBoolean('rmp') === true ? 'Yes' : 'No'),
       reviewItem('ผลิตภัณฑ์นำเข้า', radioBoolean('isImportedProduct') === true ? 'ใช่' : 'ไม่ใช่'),
-      reviewItem('จุดเด่น', value('comparativeAdvantage'))
+      reviewItem('จุดเด่น', value('comparativeAdvantage')),
+      reviewItem('ข้อมูลทางคลินิกอื่น ๆ', value('otherClinicalInformation'))
+    ]),
+    reviewSection('แพทย์และเหตุผลในการเสนอ', [
+      reviewItem('แพทย์ผู้เสนอ', `${value('physicianProfessionalTitle')} ${value('physicianName')}`.trim()),
+      reviewItem('สาขา', value('physicianSpecialty')),
+      reviewItem('ความเร่งด่วน', `${value('urgency')} · ${value('urgencyDuration')}`),
+      reviewItem('เหตุผลในการเสนอ', value('proposalReason')),
+      reviewItem('การจำกัดการสั่งใช้', radioBoolean('useRestrictionRequired') === true ? `จำกัดเฉพาะ ${value('restrictedSpecialty')}` : 'ไม่จำกัดการสั่งใช้')
+    ]),
+    reviewSection('Checklist ก่อน Submit', [
+      reviewItem('ข้อมูลบังคับ', '✓ ผ่านการตรวจสอบตามแต่ละขั้นตอน'),
+      reviewItem('ตรวจข้อมูลซ้ำ', state.duplicate.blocked === false ? '✓ ไม่ถูก Block' : '⚠ กรุณาตรวจอีกครั้ง'),
+      reviewItem('เอกสารประกอบ', validateDocumentsSilently() ? '✓ ครบตามเงื่อนไข' : '⚠ ยังไม่ครบ')
     ]),
     reviewSection('เอกสาร', documents)
   ].join('');
@@ -520,6 +618,8 @@ function restoreDraft() {
     (draft.approvers || []).forEach(renderApprover);
     updateConditionalDocuments();
     applyUrgencyDurationRule();
+    updateProposalReasonRules();
+    updateRestrictionRule();
     showToast('กู้คืนแบบร่างแล้ว — กรุณาเลือกไฟล์แนบใหม่');
   } catch {
     localStorage.removeItem(APP_CONFIG.AUTOSAVE_KEY);
@@ -596,6 +696,7 @@ function buildPayload(documents) {
       hepaticRenalDoseAdjustment: value('hepaticRenalDoseAdjustment'),
       tabletCrushingSplitting: value('tabletCrushingSplitting'),
       stabilityAfterReconstitution: value('stabilityAfterReconstitution'),
+      otherClinicalInformation: value('otherClinicalInformation'),
       storage: value('storage'),
       rmp: radioBoolean('rmp'),
       isImportedProduct: radioBoolean('isImportedProduct'),
@@ -613,7 +714,18 @@ function buildPayload(documents) {
       phone: value('physicianPhone'),
       urgency: value('urgency'),
       urgencyDuration: value('urgencyDuration'),
+      urgencyAmount: value('urgencyAmount'),
+      urgencyUnit: value('urgencyUnit'),
       proposalReason: value('proposalReason'),
+      proposalReasonStructured: {
+        noAlternative: checked('proposalReasonNoAlternative'),
+        safer: checked('proposalReasonSafer'),
+        safetyDetail: value('proposalReasonSafetyDetail'),
+        costEffective: checked('proposalReasonCostEffective'),
+        comparisonDrug: value('proposalReasonComparisonDrug'),
+        other: checked('proposalReasonOther'),
+        otherDetail: value('proposalReasonOtherDetail')
+      },
       useRestrictionRequired: radioBoolean('useRestrictionRequired', ''),
       restrictedSpecialty: value('restrictedSpecialty'),
       drugToRemove: value('drugToRemove'),
@@ -780,6 +892,8 @@ function clearFormForNewSubmission() {
   approversContainer.innerHTML = '';
   renderDocuments();
   applyUrgencyDurationRule();
+  updateProposalReasonRules();
+  updateRestrictionRule();
   successPanel.classList.add('hidden');
   form.classList.remove('hidden');
   document.querySelector('#form-actions')?.classList.remove('hidden');
@@ -801,6 +915,15 @@ function bindEvents() {
     applyUrgencyDurationRule();
     saveDraft();
   });
+  form.elements.namedItem('urgencyAmount')?.addEventListener('input', applyUrgencyDurationRule);
+  form.elements.namedItem('urgencyUnit')?.addEventListener('change', applyUrgencyDurationRule);
+  ['proposalReasonNoAlternative', 'proposalReasonSafer', 'proposalReasonCostEffective', 'proposalReasonOther'].forEach(name => {
+    form.elements.namedItem(name)?.addEventListener('change', updateProposalReasonRules);
+  });
+  ['proposalReasonSafetyDetail', 'proposalReasonComparisonDrug', 'proposalReasonOtherDetail'].forEach(name => {
+    form.elements.namedItem(name)?.addEventListener('input', syncProposalReason);
+  });
+  document.querySelectorAll('[name="useRestrictionRequired"]').forEach(input => input.addEventListener('change', updateRestrictionRule));
   form.addEventListener('input', debounce(saveDraft, 500));
   form.addEventListener('change', debounce(saveDraft, 300));
   document.querySelector('#clear-draft-btn').addEventListener('click', () => {
@@ -820,6 +943,8 @@ async function initialize() {
   bindEvents();
   restoreDraft();
   applyUrgencyDurationRule();
+  updateProposalReasonRules();
+  updateRestrictionRule();
   showStep(0);
   await loadPublicConfiguration();
   await loadPublicTemplates();
