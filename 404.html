@@ -118,6 +118,7 @@
             <label class="field full"><span>Hepatic / Renal Dose Adjustment *</span><textarea name="hepaticRenalDoseAdjustment" rows="3" required></textarea></label>
             <label class="field full"><span>การบดหรือแบ่งเม็ดยา</span><textarea name="tabletCrushingSplitting" rows="2"></textarea></label>
             <label class="field full"><span>อายุหลังผสม</span><textarea name="stabilityAfterReconstitution" rows="2"></textarea></label>
+            <label class="field full"><span>ข้อมูลทางคลินิกอื่น ๆ (Others)</span><textarea name="otherClinicalInformation" rows="3" placeholder="ข้อมูลเพิ่มเติมตามหัวข้อ 6.13 ของแบบฟอร์ม หากมี"></textarea></label>
           </div>
         </section>
 
@@ -143,10 +144,29 @@
               <label class="field"><span>สาขา *</span><input name="physicianSpecialty" required></label>
               <label class="field"><span>เบอร์โทรศัพท์แพทย์</span><input type="tel" name="physicianPhone"></label>
               <label class="field"><span>ความเร่งด่วน *</span><select name="urgency" required><option value="" selected disabled>กรุณาเลือก</option><option value="URGENT">เร่งด่วน</option><option value="NON_URGENT">ไม่เร่งด่วน</option></select></label>
-              <label class="field"><span>ระยะเวลาเร่งด่วน *</span><input name="urgencyDuration" placeholder="เช่น ภายใน 24 ชั่วโมง" required></label>
-              <label class="field full"><span>เหตุผลในการเสนอ *</span><textarea name="proposalReason" rows="3" required></textarea></label>
-              <div class="field full"><span>จำกัดการสั่งใช้เฉพาะแพทย์หรือไม่</span><div class="inline-options"><label><input type="radio" name="useRestrictionRequired" value="true"> ใช่</label><label><input type="radio" name="useRestrictionRequired" value="false"> ไม่ใช่</label></div></div>
-              <label class="field full"><span>สาขาแพทย์ที่อนุญาตให้สั่งใช้</span><input name="restrictedSpecialty"></label>
+              <div class="field">
+                <span>ระยะเวลาเร่งด่วน *</span>
+                <div class="urgent-duration-fields grid two-columns">
+                  <label class="field"><span>จำนวน</span><input type="number" name="urgencyAmount" min="1" step="1" inputmode="numeric" placeholder="เช่น 24"></label>
+                  <label class="field"><span>หน่วย</span><select name="urgencyUnit"><option value="HOURS">ชั่วโมง</option><option value="DAYS">วัน</option></select></label>
+                </div>
+                <input name="urgencyDuration" readonly required aria-readonly="true" placeholder="ระบบจะสรุประยะเวลาให้อัตโนมัติ">
+              </div>
+              <div class="field full proposal-reason-group">
+                <span>เหตุผลในการเสนอ *</span>
+                <div class="stacked-options">
+                  <label><input type="checkbox" name="proposalReasonNoAlternative"> ไม่มียาอื่นในเภสัชตำรับที่ใช้ในข้อบ่งใช้นี้</label>
+                  <label><input type="checkbox" name="proposalReasonSafer"> มีความปลอดภัยมากกว่ายาที่มีอยู่เดิม</label>
+                  <label class="conditional-detail" data-proposal-detail="safer"><span>ด้านความปลอดภัยที่ดีกว่า</span><input name="proposalReasonSafetyDetail" placeholder="ระบุประเด็นความปลอดภัย"></label>
+                  <label><input type="checkbox" name="proposalReasonCostEffective"> มีประสิทธิภาพและราคาคุ้มค่ากว่ายาที่มีอยู่เดิม</label>
+                  <label class="conditional-detail" data-proposal-detail="cost"><span>ยาเดิมที่ใช้เปรียบเทียบ</span><input name="proposalReasonComparisonDrug" placeholder="ระบุชื่อยาที่มีอยู่เดิม"></label>
+                  <label><input type="checkbox" name="proposalReasonOther"> เหตุผลอื่น / ข้อเปรียบเทียบกับยาอื่นในกลุ่มเดียวกัน</label>
+                  <label class="conditional-detail" data-proposal-detail="other"><span>รายละเอียดเหตุผลอื่น</span><textarea name="proposalReasonOtherDetail" rows="3"></textarea></label>
+                </div>
+                <textarea name="proposalReason" class="hidden" aria-hidden="true" tabindex="-1"></textarea>
+              </div>
+              <div class="field full"><span>จำกัดการสั่งใช้เฉพาะแพทย์หรือไม่ *</span><div class="inline-options"><label><input type="radio" name="useRestrictionRequired" value="false" required> ไม่จำเป็นต้องจำกัดการสั่งใช้</label><label><input type="radio" name="useRestrictionRequired" value="true" required> จำกัดเฉพาะแพทย์บางสาขา</label></div></div>
+              <label class="field full restriction-specialty-field conditional-hidden"><span>สาขาแพทย์ที่อนุญาตให้สั่งใช้ *</span><input name="restrictedSpecialty"></label>
               <label class="field full"><span>ยาที่เสนอให้ตัดออกจากบัญชี</span><textarea name="drugToRemove" rows="2"></textarea></label>
               <label class="field full"><span>ผลกระทบต่อผู้ป่วยหากยาไม่เข้าบัญชี</span><textarea name="impactIfNotApproved" rows="2"></textarea></label>
             </div>
@@ -168,7 +188,17 @@
         <section class="form-step" data-step="5">
           <div class="section-heading"><span class="section-number">6</span><div><h2>ตรวจสอบและส่งคำขอ</h2><p>เมื่อ Submit ระบบจะสร้างโฟลเดอร์ บันทึกข้อมูล และสร้าง PDF ตาม Template</p></div></div>
           <div id="review-content" class="review-content"></div>
-          <label class="declaration"><input type="checkbox" name="declarationAccepted" required><span>ข้าพเจ้ายืนยันว่าข้อมูลและเอกสารที่ส่งมีความถูกต้อง และยอมรับเงื่อนไขการเสนอยาของโรงพยาบาล *</span></label>
+          <section class="terms-card">
+            <h3>เงื่อนไขสำคัญก่อนส่งคำขอ</h3>
+            <ul>
+              <li>ราคาที่เสนอสามารถยืนราคาได้อย่างน้อย 1 ปี โดยสามารถปรับลดราคาได้</li>
+              <li>เอกสารรับรองและเอกสารทางวิชาการที่กำหนดต้องครบถ้วนก่อนเข้าสู่วาระพิจารณา</li>
+              <li>งานวิจัยสนับสนุนควรไม่เก่าเกิน 5 ปี และส่งไม่เกิน 3 ฉบับ; หากจำเป็นต้องใช้หลักฐานเก่ากว่า 5 ปีต้องระบุเหตุผล</li>
+              <li>หากยาไม่ผ่านการพิจารณา การเสนอใหม่ต้องเป็นไปตามเงื่อนไขและระยะเวลาที่โรงพยาบาลกำหนด</li>
+              <li>โรงพยาบาลสงวนสิทธิ์ในการบริหารรายการยาตามมาตรฐาน คุณภาพ และความปลอดภัยของผู้ป่วย</li>
+            </ul>
+          </section>
+          <label class="declaration"><input type="checkbox" name="declarationAccepted" required><span>ข้าพเจ้ายืนยันว่าข้อมูลและเอกสารที่ส่งมีความถูกต้อง ได้อ่านเงื่อนไขข้างต้น และยอมรับเงื่อนไขการเสนอยาของโรงพยาบาล *</span></label>
           <div id="submit-progress" class="progress-panel hidden" aria-live="polite"><div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div><p id="progress-message">กำลังเตรียมข้อมูล…</p></div>
         </section>
 
