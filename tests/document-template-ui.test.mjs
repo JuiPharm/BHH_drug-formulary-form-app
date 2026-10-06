@@ -11,7 +11,7 @@ test('app imports inline resource lookup helper', () => {
 
 test('app state stores public templates returned by backend', () => {
   assert.match(appSource, /publicTemplates:\s*\[\]/);
-  assert.match(appSource, /state\.publicTemplates\s*=\s*Array\.isArray\(templates\)\s*\?\s*templates\s*:\s*\[\];/);
+  assert.match(appSource, /state\.publicTemplates\s*=\s*Array\.isArray\(templatesResult\.value\)\s*\?\s*templatesResult\.value\s*:\s*\[\];/);
 });
 
 test('document renderer resolves templates and examples per document', () => {
@@ -20,11 +20,13 @@ test('document renderer resolves templates and examples per document', () => {
   assert.match(appSource, /resource\.actionLabel/);
 });
 
-test('public template load rerenders document cards so inline buttons appear', () => {
-  const functionStart = appSource.indexOf('async function loadPublicTemplates()');
+test('public resource load renders document cards after template metadata is ready', () => {
+  const functionStart = appSource.indexOf('async function loadInitialPublicData()');
   const functionEnd = appSource.indexOf('async function downloadPublicTemplate', functionStart);
   const functionSource = appSource.slice(functionStart, functionEnd);
-  assert.match(functionSource, /renderDocuments\(\)/);
+  const templateAssignmentIndex = functionSource.indexOf('state.publicTemplates =');
+  const renderIndex = functionSource.indexOf('renderDocuments()');
+  assert.ok(templateAssignmentIndex >= 0 && renderIndex > templateAssignmentIndex);
 });
 
 test('styles include a prominent but theme-aligned resource panel', () => {
