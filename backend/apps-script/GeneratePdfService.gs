@@ -451,7 +451,12 @@ function buildTemplateReplacements_(context, chairperson, director) {
   replacements[PLACEHOLDERS.PhysicianSpecialty] = physician.Specialty;
   replacements[PLACEHOLDERS.PhysicianPhone] = physician.PhysicianPhone;
   const isUrgent = String(physician.Urgency || '') === 'URGENT';
-  const urgencyUnitLabel = String(physician.UrgencyUnit || '') === 'DAYS' ? 'วัน' : 'ชั่วโมง';
+  const urgencyUnitLabels = {
+    HOURS: 'ชั่วโมง',
+    DAYS: 'วัน',
+    MONTHS: 'เดือน'
+  };
+  const urgencyUnitLabel = urgencyUnitLabels[String(physician.UrgencyUnit || '')] || '';
   const restrictionSet = physician.UseRestrictionRequired !== '';
   const restrictionRequired = restrictionSet && toBoolean_(physician.UseRestrictionRequired);
   replacements[PLACEHOLDERS.Urgency] = isUrgent ? 'เร่งด่วน' : 'ไม่เร่งด่วน';

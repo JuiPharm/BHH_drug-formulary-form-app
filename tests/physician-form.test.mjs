@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const html = fs.readFileSync(path.join(here, '..', 'index.html'), 'utf8');
 const fallbackHtml = fs.readFileSync(path.join(here, '..', '404.html'), 'utf8');
+const appSource = fs.readFileSync(path.join(here, '..', 'js', 'app.js'), 'utf8');
 
 function tagFor(name) {
   const match = html.match(new RegExp(`<(?:input|select|textarea)\\b[^>]*\\bname=["']${name}["'][^>]*>`, 'i'));
@@ -44,3 +45,35 @@ console.log('physician-form.test.mjs: PASS');
 
 assert.match(fallbackHtml, /แพทย์ผู้เสนอ\s*—\s*Required/, '404 fallback must use the same required physician form');
 assert.match(html, /ข้อมูลแพทย์ผู้เสนอเป็นข้อมูลบังคับ.*ผู้เห็นชอบเป็น Optional/, 'section help text must reflect required physician and optional approvers');
+
+
+assert.match(
+  html,
+  /<select name="urgency" required>/,
+  'urgency selection must be required'
+);
+assert.match(
+  html,
+  /name="urgencyUnit"[\s\S]*value="HOURS">ชั่วโมง<\/option>[\s\S]*value="DAYS">วัน<\/option>[\s\S]*value="MONTHS">เดือน<\/option>/,
+  'urgent unit must offer hours, days and months'
+);
+assert.match(
+  fallbackHtml,
+  /value="MONTHS">เดือน<\/option>/,
+  '404 fallback must offer month urgency unit'
+);
+assert.match(
+  appSource,
+  /amountControl\.required = urgent/,
+  'urgency amount must become required when URGENT is selected'
+);
+assert.match(
+  appSource,
+  /unitControl\.required = urgent/,
+  'urgency unit must become required when URGENT is selected'
+);
+assert.match(
+  html,
+  /<option value="" selected disabled>กรุณาเลือกหน่วย<\/option>/,
+  'urgent unit must require an explicit selection'
+);

@@ -80,7 +80,7 @@ function applyUrgencyDurationRule() {
   durationControl.value = buildUrgencyDuration(
     urgencyControl.value,
     amountControl?.value || '',
-    unitControl?.value || 'HOURS'
+    unitControl?.value || ''
   );
   durationControl.readOnly = true;
   durationControl.setAttribute('aria-readonly', 'true');
