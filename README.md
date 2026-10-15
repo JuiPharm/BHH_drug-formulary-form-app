@@ -1,4 +1,4 @@
-# Drug Formulary Form App v1.3.3
+# Drug Formulary Form App v1.3.4
 
 Static Form App สำหรับบริษัทยา ใช้งานบน GitHub Pages และเชื่อม Google Apps Script Backend ด้วย `fetch()` แบบ `text/plain;charset=utf-8`
 
@@ -10,7 +10,7 @@ Static Form App สำหรับบริษัทยา ใช้งานบ
 - ข้อมูลบริษัทและผู้แทน พร้อม E-mail/โทรศัพท์บังคับ
 - ข้อมูลผลิตภัณฑ์และ Clinical Pharmacology ตามแบบฟอร์ม PTC
 - ข้อมูลแพทย์ผู้เสนอเป็น Required ยกเว้นเบอร์โทรแพทย์เป็น Optional
-- เมื่อเลือกเร่งด่วน ระบบใช้จำนวน + หน่วย (ชั่วโมง/วัน) เพื่อสร้างค่าระยะเวลาแบบมาตรฐาน; เมื่อเลือกไม่เร่งด่วน ระบบเติม `รอบการนำเสนอของคณะกรรมการ PTC` อัตโนมัติ
+- เมื่อเลือกเร่งด่วน ระบบบังคับระบุจำนวน + หน่วย (ชั่วโมง/วัน/เดือน) เพื่อสร้างค่าระยะเวลาแบบมาตรฐาน; เมื่อเลือกไม่เร่งด่วน ระบบเติม `รอบการนำเสนอของคณะกรรมการ PTC` อัตโนมัติ
 - ผู้เห็นชอบ 0–6 คนแบบ Optional
 - Dynamic Certificate of Free Sale เมื่อเป็นผลิตภัณฑ์นำเข้า
 - งานวิจัย 1–3 ฉบับ พร้อม metadata และเหตุผลเมื่อเก่ากว่า 5 ปี
@@ -126,7 +126,7 @@ Resource ตัวอย่างแยกจาก `PI_TEMPLATE` / `PRESENTATIO
 
 Backend source is version-controlled under `backend/apps-script/`.
 
-The current backend snapshot is **v1.3.5** and is designed to work with Form App v1.3.3 and
+The current backend snapshot is **v1.3.6** and is designed to work with Form App v1.3.4 and
 `FM-02.2-PTC-004 Rev.13 (11/07/2024)`. Environment-specific Script Properties, credentials,
 tokens, and production settings are intentionally not stored in Git.
 
@@ -152,3 +152,14 @@ Backend v1.3.5 ตั้งชื่อ `GENERATED_PHYSICIAN_FORM` ตาม Bra
 ตัวอย่าง: `Drug_Formulary_Submission_Airtal_v01.pdf` และเมื่อ Regenerate จะเป็น
 `Drug_Formulary_Submission_Airtal_v02.pdf`. ระบบ sanitize อักขระที่ไม่เหมาะกับชื่อไฟล์
 และ fallback เป็น Generic Name หาก Brand Name ว่าง
+
+
+## Urgency (v1.3.4)
+
+ข้อมูลความเร่งด่วนเป็น Required:
+- ต้องเลือก `URGENT` หรือ `NON_URGENT`
+- เมื่อเลือก `URGENT` ต้องกรอกจำนวนเวลาเป็นจำนวนเต็มมากกว่า 0 และเลือกหน่วยอย่างชัดเจน
+- หน่วยที่รองรับ: `HOURS` (ชั่วโมง), `DAYS` (วัน), `MONTHS` (เดือน)
+- เมื่อเลือก `NON_URGENT` ระบบกำหนดระยะเวลาเป็น `รอบการนำเสนอของคณะกรรมการ PTC` อัตโนมัติ
+
+Backend v1.3.6 ตรวจ validation ชุดเดียวกัน และ PDF แสดงหน่วย `MONTHS` เป็น “เดือน”
