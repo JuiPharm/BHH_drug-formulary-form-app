@@ -129,6 +129,21 @@ function generateSubmissionPdf_(submissionId, requestId, options) {
  */
 function retryGeneratePdf_(payload, requestId) {
   requireFields_(payload, ['submissionId'], 'payload');
+  const submission = findFirstObject_(
+    getSheet_('Submissions'),
+    'SubmissionID',
+    payload.submissionId
+  );
+  if (!submission) {
+    throw appError_('SUBMISSION_NOT_FOUND', 'ไม่พบคำขอ');
+  }
+  if (String(submission.CurrentStatus || '') !== STATUS.PDF_GENERATION_FAILED) {
+    throw appError_(
+      'PDF_RETRY_NOT_ALLOWED',
+      'Retry PDF ใช้ได้เฉพาะคำขอที่อยู่ในสถานะ PDF_GENERATION_FAILED'
+    );
+  }
+
   const actorEmail = payload.__actorEmail || getActorEmail_();
   const result = generateSubmissionPdf_(payload.submissionId, requestId, {
     mode: 'RETRY',
@@ -148,7 +163,8 @@ function retryGeneratePdf_(payload, requestId) {
 /**
  * Regenerate a new unsigned PDF from the data already persisted for a
  * submission. Previous PDF versions are retained for audit/history and the
- * normal workflow status is preserved.
+ * normal workflow status is preserved unless a signed form must be superseded
+ * or the submission is recovering from PDF_GENERATION_FAILED.
  */
 function regenerateSubmissionPdf_(payload, requestId) {
   requireFields_(payload, ['submissionId', 'reason'], 'payload');
