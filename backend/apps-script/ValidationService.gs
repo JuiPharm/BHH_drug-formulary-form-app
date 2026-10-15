@@ -82,10 +82,18 @@ function validatePhysicianProposal_(physician) {
     if (!Number.isFinite(amount) || amount <= 0 || Math.floor(amount) !== amount) {
       throw appError_('INVALID_URGENT_AMOUNT', 'กรณีเร่งด่วนต้องระบุจำนวนเวลาเป็นจำนวนเต็มมากกว่า 0');
     }
-    if (['HOURS', 'DAYS'].indexOf(unit) === -1) {
-      throw appError_('INVALID_URGENT_UNIT', 'กรณีเร่งด่วนต้องเลือกหน่วย HOURS หรือ DAYS');
+    if (['HOURS', 'DAYS', 'MONTHS'].indexOf(unit) === -1) {
+      throw appError_(
+        'INVALID_URGENT_UNIT',
+        'กรณีเร่งด่วนต้องเลือกหน่วย HOURS, DAYS หรือ MONTHS'
+      );
     }
-    const expectedDuration = 'ภายใน ' + amount + ' ' + (unit === 'DAYS' ? 'วัน' : 'ชั่วโมง');
+    const urgencyUnitLabels = {
+      HOURS: 'ชั่วโมง',
+      DAYS: 'วัน',
+      MONTHS: 'เดือน'
+    };
+    const expectedDuration = 'ภายใน ' + amount + ' ' + urgencyUnitLabels[unit];
     if (urgencyDuration !== expectedDuration) {
       throw appError_('INVALID_URGENT_DURATION', 'ระยะเวลาเร่งด่วนไม่ตรงกับจำนวนและหน่วยที่ระบุ');
     }
