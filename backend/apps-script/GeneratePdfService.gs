@@ -206,7 +206,27 @@ function regenerateSubmissionPdf_(payload, requestId) {
   });
 
   let resultingStatus = previousStatus;
-  if (previousStatus === STATUS.PDF_GENERATION_FAILED) {
+  let signedFormSuperseded = false;
+
+  if (signedFormReceived) {
+    supersedeCurrentSignedPhysicianForms_(
+      payload.submissionId,
+      result.version,
+      reason
+    );
+    updateFirstMatch_(getSheet_('Submissions'), 'SubmissionID', payload.submissionId, {
+      SignedFormReceived: false,
+      UpdatedAt: new Date()
+    });
+    updateSubmissionStatusInternal_(
+      payload.submissionId,
+      STATUS.AWAITING_SIGNATURE,
+      actorEmail,
+      'Regenerate PDF v' + result.version + ' ต้องลงนามใหม่: ' + reason
+    );
+    resultingStatus = STATUS.AWAITING_SIGNATURE;
+    signedFormSuperseded = true;
+  } else if (previousStatus === STATUS.PDF_GENERATION_FAILED) {
     updateSubmissionStatusInternal_(
       payload.submissionId,
       STATUS.AWAITING_SIGNATURE,
@@ -225,19 +245,37 @@ function regenerateSubmissionPdf_(payload, requestId) {
     {
       reason: reason,
       generatedVersion: result.version,
-      templateFileId: result.fileId ? String(
-        getSystemSettings_().ACTIVE_PDF_TEMPLATE_ID || ''
-      ) : '',
+      templateFileId: String(getSystemSettings_().ACTIVE_PDF_TEMPLATE_ID || ''),
       previousStatus: previousStatus,
       resultingStatus: resultingStatus,
-      signedFormReceived: signedFormReceived
+      signedFormReceivedBeforeRegenerate: signedFormReceived,
+      signedFormSuperseded: signedFormSuperseded
     }
   );
 
   result.previousStatus = previousStatus;
   result.currentStatus = resultingStatus;
-  result.signedFormReceived = signedFormReceived;
+  result.signedFormReceivedBeforeRegenerate = signedFormReceived;
+  result.signedFormSuperseded = signedFormSuperseded;
   return result;
+}
+
+function supersedeCurrentSignedPhysicianForms_(submissionId, generatedPdfVersion, reason) {
+  const sheet = getSheet_('Documents');
+  const rows = findObjects_(sheet, function (row) {
+    return String(row.SubmissionID) === String(submissionId) &&
+      String(row.DocumentType) === String(DOCUMENT_TYPE.SIGNED_PHYSICIAN_FORM) &&
+      toBoolean_(row.IsCurrentVersion);
+  });
+
+  rows.forEach(function (row) {
+    updateRowByNumber_(sheet, row.__rowNumber, {
+      ReviewStatus: 'SUPERSEDED',
+      ReviewNote: 'Superseded by regenerated unsigned PDF v' +
+        String(generatedPdfVersion).padStart(2, '0') + ': ' + reason,
+      IsCurrentVersion: false
+    });
+  });
 }
 
 function markPreviousGeneratedPdfVersionsNotCurrent_(submissionId, currentDocumentId) {
