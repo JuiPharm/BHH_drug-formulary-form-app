@@ -71,6 +71,12 @@ function routeApiRequest_(request, event) {
         data = retryGeneratePdf_(payload, requestId);
         break;
       }
+      case 'regenerateSubmissionPdf': {
+        const admin = requireAdmin_(request);
+        payload.__actorEmail = admin.email;
+        data = regenerateSubmissionPdf_(payload, requestId);
+        break;
+      }
       case 'listSubmissions':
         requireAdmin_(request);
         data = listSubmissions_(payload);
