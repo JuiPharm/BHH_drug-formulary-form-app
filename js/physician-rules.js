@@ -2,7 +2,8 @@ export const NON_URGENT_PTC_DURATION = 'รอบการนำเสนอข�
 
 export const URGENCY_UNIT_LABELS = Object.freeze({
   HOURS: 'ชั่วโมง',
-  DAYS: 'วัน'
+  DAYS: 'วัน',
+  MONTHS: 'เดือน'
 });
 
 export function buildUrgencyDuration(urgency, amount = '', unit = 'HOURS') {
