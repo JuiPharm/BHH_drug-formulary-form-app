@@ -153,7 +153,7 @@
             <textarea id="regenerate-pdf-reason" rows="2" maxlength="500" placeholder="เช่น ปรับ Template ใหม่ / แก้ไขข้อมูลหลังตรวจสอบ" required></textarea>
           </label>
           <p id="regenerate-pdf-warning" class="warning-note hidden">
-            คำขอนี้มีแบบฟอร์มที่ลงนามแล้ว การ Regenerate จะสร้าง PDF ฉบับใหม่ซึ่งอาจไม่ตรงกับเอกสารที่ลงนามไว้เดิม
+            คำขอนี้มีแบบฟอร์มที่ลงนามแล้ว เมื่อ Regenerate ระบบจะเก็บไฟล์ลงนามเดิมเป็นประวัติ เปลี่ยนเป็น Superseded และให้คำขอกลับไปรอลงนาม PDF ฉบับใหม่
           </p>
           <div class="regenerate-pdf-actions">
             <button id="regenerate-pdf-button" type="submit" class="secondary-button">Regenerate PDF</button>
