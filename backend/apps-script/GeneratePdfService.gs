@@ -127,8 +127,8 @@ function generateSubmissionPdf_(submissionId, requestId, options) {
 }
 
 /**
- * Retry is kept for the failure-recovery path. A successful retry returns the
- * submission to AWAITING_SIGNATURE as before.
+ * Build a human-readable GENERATED_PHYSICIAN_FORM filename from the proposed
+ * drug name while keeping a version suffix for regeneration history.
  */
 function buildGeneratedPdfFileName_(brandName, genericName, version) {
   const sourceName = String(brandName || genericName || 'Drug').trim();
@@ -147,6 +147,10 @@ function buildGeneratedPdfFileName_(brandName, genericName, version) {
     String(version || 1).padStart(2, '0') + '.pdf';
 }
 
+/**
+ * Retry is kept for the failure-recovery path. A successful retry returns the
+ * submission to AWAITING_SIGNATURE as before.
+ */
 function retryGeneratePdf_(payload, requestId) {
   requireFields_(payload, ['submissionId'], 'payload');
   const submission = findFirstObject_(
