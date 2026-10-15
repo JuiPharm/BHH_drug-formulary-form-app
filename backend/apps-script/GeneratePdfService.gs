@@ -38,8 +38,11 @@ function generateSubmissionPdf_(submissionId, requestId, options) {
     replaceDocumentPlaceholders_(document, replacements);
     document.saveAndClose();
 
-    const pdfName = context.submission.SubmissionNo + '_Drug_Formulary_Submission_Unsigned_v' +
-      String(pdfVersion).padStart(2, '0') + '.pdf';
+    const pdfName = buildGeneratedPdfFileName_(
+      context.submission.BrandName,
+      context.submission.GenericName,
+      pdfVersion
+    );
     const pdfBlob = DriveApp.getFileById(workingFile.getId())
       .getAs(MimeType.PDF)
       .setName(pdfName);
@@ -121,6 +124,27 @@ function generateSubmissionPdf_(submissionId, requestId, options) {
       console.warn('ไม่สามารถลบ Working Google Docs: ' + cleanupError.message);
     }
   }
+}
+
+/**
+ * Build a human-readable GENERATED_PHYSICIAN_FORM filename from the proposed
+ * drug name while keeping a version suffix for regeneration history.
+ */
+function buildGeneratedPdfFileName_(brandName, genericName, version) {
+  const sourceName = String(brandName || genericName || 'Drug').trim();
+  let safeName = sourceName
+    .replace(/[\\\/:*?"<>|\u0000-\u001F]/g, ' ')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^[._-]+|[._-]+$/g, '');
+
+  if (!safeName) {
+    safeName = 'Drug';
+  }
+  safeName = safeName.slice(0, 80);
+
+  return 'Drug_Formulary_Submission_' + safeName + '_v' +
+    String(version || 1).padStart(2, '0') + '.pdf';
 }
 
 /**
