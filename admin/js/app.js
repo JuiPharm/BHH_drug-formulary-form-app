@@ -409,15 +409,27 @@ function renderDetail(detail) {
 }
 
 function renderDocuments(documents) {
-  documentList.innerHTML = documents.length ? documents.map(document => `
-    <article class="document-item">
-      <div>
-        <strong>${escapeHtml(document.documentType)} · v${Number(document.documentVersion || 0)}</strong>
-        <span>${escapeHtml(document.storedFileName || document.originalFileName)} · ${escapeHtml(formatBytes(document.fileSizeBytes))}</span>
-      </div>
-      <button type="button" class="secondary-button" data-download-document="${escapeHtml(document.documentId)}">ดาวน์โหลด</button>
-    </article>
-  `).join('') : '<p class="muted">ไม่พบเอกสาร</p>';
+  documentList.innerHTML = documents.length ? documents.map(document => {
+    const currentChip = document.isCurrentVersion
+      ? '<span class="document-version-chip">Current</span>'
+      : '';
+    const supersededChip = String(document.reviewStatus || '').toUpperCase() === 'SUPERSEDED'
+      ? '<span class="document-version-chip document-version-chip--superseded">Superseded</span>'
+      : '';
+    const reviewNote = document.reviewNote
+      ? `<span class="document-review-note">${escapeHtml(document.reviewNote)}</span>`
+      : '';
+
+    return `
+      <article class="document-item">
+        <div>
+          <strong>${escapeHtml(document.documentType)} · v${Number(document.documentVersion || 0)} ${currentChip} ${supersededChip}</strong>
+          <span>${escapeHtml(document.storedFileName || document.originalFileName)} · ${escapeHtml(formatBytes(document.fileSizeBytes))}</span>
+          ${reviewNote}
+        </div>
+        <button type="button" class="secondary-button" data-download-document="${escapeHtml(document.documentId)}">ดาวน์โหลด</button>
+      </article>`;
+  }).join('') : '<p class="muted">ไม่พบเอกสาร</p>';
   documentList.querySelectorAll('[data-download-document]').forEach(button => {
     button.addEventListener('click', () => downloadDocument(button.dataset.downloadDocument, button));
   });
@@ -530,7 +542,7 @@ async function regeneratePdf(event) {
     String(submission.SignedFormReceived || '').toUpperCase() === 'TRUE';
 
   const confirmationMessage = signedFormReceived
-    ? 'คำขอนี้มีแบบฟอร์มที่ลงนามแล้ว PDF ใหม่อาจไม่ตรงกับเอกสารที่ลงนามไว้เดิม ต้องการ Regenerate ต่อหรือไม่?'
+    ? 'คำขอนี้มีแบบฟอร์มที่ลงนามแล้ว หาก Regenerate ระบบจะเก็บไฟล์เดิมเป็น Superseded และเปลี่ยนสถานะกลับเป็นรอลงนาม PDF ฉบับใหม่ ต้องการดำเนินการต่อหรือไม่?'
     : 'ต้องการสร้าง PDF เวอร์ชันใหม่จากข้อมูลที่บันทึกในคำขอนี้หรือไม่? PDF เวอร์ชันเดิมจะยังถูกเก็บไว้';
 
   if (!window.confirm(confirmationMessage)) return;
@@ -543,7 +555,11 @@ async function regeneratePdf(event) {
       reason,
       acknowledgeSignedFormImpact: signedFormReceived
     });
-    showToast(`Regenerate PDF v${String(result.version || '').padStart(2, '0')} สำเร็จ`);
+    showToast(
+      result.signedFormSuperseded
+        ? `Regenerate PDF v${String(result.version || '').padStart(2, '0')} สำเร็จ · ต้องลงนามใหม่`
+        : `Regenerate PDF v${String(result.version || '').padStart(2, '0')} สำเร็จ`
+    );
     reasonInput.value = '';
     await Promise.all([loadDashboard(), openDetail(state.selectedSubmissionId)]);
   } catch (error) {
