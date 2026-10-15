@@ -70,3 +70,12 @@ test('versions are bumped for regenerate release', () => {
   assert.match(configSource, /VERSION:\s*'1\.3\.4'/);
   assert.match(adminConfig, /APP_VERSION:\s*'1\.2\.0'/);
 });
+
+
+test('retry PDF is restricted to failed generation status', () => {
+  const start = pdfSource.indexOf('function retryGeneratePdf_');
+  const end = pdfSource.indexOf('function regenerateSubmissionPdf_', start);
+  const source = pdfSource.slice(start, end);
+  assert.match(source, /STATUS\.PDF_GENERATION_FAILED/);
+  assert.match(source, /PDF_RETRY_NOT_ALLOWED/);
+});
