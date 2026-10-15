@@ -126,7 +126,7 @@ Resource ตัวอย่างแยกจาก `PI_TEMPLATE` / `PRESENTATIO
 
 Backend source is version-controlled under `backend/apps-script/`.
 
-The current backend snapshot is **v1.3.4** and is designed to work with Form App v1.3.3 and
+The current backend snapshot is **v1.3.5** and is designed to work with Form App v1.3.3 and
 `FM-02.2-PTC-004 Rev.13 (11/07/2024)`. Environment-specific Script Properties, credentials,
 tokens, and production settings are intentionally not stored in Git.
 
@@ -141,3 +141,14 @@ workflow status ปัจจุบันโดยอัตโนมัติ (�
 หากคำขอมีแบบฟอร์มที่ลงนามแล้ว Admin ต้องยืนยันผลกระทบก่อนสร้าง PDF ฉบับใหม่ ระบบจะเก็บ
 Signed Form เดิมไว้เป็นประวัติและ mark เป็น `SUPERSEDED`, ตั้ง `SignedFormReceived = FALSE`
 และเปลี่ยนสถานะกลับเป็น `AWAITING_SIGNATURE` เพื่อให้แพทย์ลงนาม PDF version ใหม่
+
+
+## Generated PDF filename
+
+Backend v1.3.5 ตั้งชื่อ `GENERATED_PHYSICIAN_FORM` ตาม Brand Name ของยาที่เสนอ:
+
+`Drug_Formulary_Submission_{BrandName}_vNN.pdf`
+
+ตัวอย่าง: `Drug_Formulary_Submission_Airtal_v01.pdf` และเมื่อ Regenerate จะเป็น
+`Drug_Formulary_Submission_Airtal_v02.pdf`. ระบบ sanitize อักขระที่ไม่เหมาะกับชื่อไฟล์
+และ fallback เป็น Generic Name หาก Brand Name ว่าง
