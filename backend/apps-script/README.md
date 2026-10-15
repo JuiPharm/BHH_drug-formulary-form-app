@@ -30,6 +30,7 @@ Google Apps Script project: `1L2bGjBd7pXgR3UN9bGUWRcrbHhcfANKR1dOLmK7imZPaNrJk6d
 - Regenerate ใช้ Active PDF Template และ Active signatories ณ เวลาที่สร้างฉบับใหม่
 - Regenerate ต้องระบุเหตุผล และบันทึก generation mode/reason/source status ใน `SourceManifestJSON`
 - Regenerate ไม่เปลี่ยน workflow status ยกเว้นกรณีเดิมเป็น `PDF_GENERATION_FAILED` ซึ่งจะกลับไป `AWAITING_SIGNATURE`
+- `retryGeneratePdf` เดิมถูกจำกัดให้ใช้เฉพาะ `PDF_GENERATION_FAILED`; งานสร้างฉบับใหม่ทั่วไปให้ใช้ `regenerateSubmissionPdf`
 - ถ้ามี Signed Form แล้ว ต้องยืนยันผลกระทบก่อน Regenerate; ระบบจะเก็บ Signed Form เดิมเป็น `SUPERSEDED`, ตั้ง `SignedFormReceived = FALSE` และกลับไป `AWAITING_SIGNATURE` เพื่อให้ลงนามฉบับใหม่
 ## Files
 - `Code.gs` — public entry points / setup helpers
