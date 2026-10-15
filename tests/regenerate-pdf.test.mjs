@@ -30,15 +30,19 @@ test('regenerate requires an audit reason and protects signed forms', () => {
   assert.match(source, /STATUS\.CANCELLED/);
 });
 
-test('regenerate preserves status except PDF failure recovery', () => {
+test('regenerate preserves normal status but requires re-signature for signed forms', () => {
   const start = pdfSource.indexOf('function regenerateSubmissionPdf_');
   const end = pdfSource.indexOf('function markPreviousGeneratedPdfVersionsNotCurrent_', start);
   const source = pdfSource.slice(start, end);
 
   assert.match(source, /previousStatus === STATUS\.PDF_GENERATION_FAILED/);
+  assert.match(source, /if \(signedFormReceived\)/);
+  assert.match(source, /supersedeCurrentSignedPhysicianForms_/);
+  assert.match(source, /SignedFormReceived:\s*false/);
   assert.match(source, /STATUS\.AWAITING_SIGNATURE/);
   assert.match(source, /result\.previousStatus = previousStatus/);
   assert.match(source, /result\.currentStatus = resultingStatus/);
+  assert.match(source, /result\.signedFormSuperseded = signedFormSuperseded/);
 });
 
 test('new generated PDF becomes current without deleting history', () => {
@@ -48,6 +52,7 @@ test('new generated PDF becomes current without deleting history', () => {
   assert.match(pdfSource, /generationMode/);
   assert.match(pdfSource, /generationReason/);
   assert.match(pdfSource, /sourceStatus/);
+  assert.match(pdfSource, /ReviewStatus:\s*'SUPERSEDED'/);
 });
 
 test('admin UI requires reason and calls regenerate action', () => {
@@ -57,6 +62,8 @@ test('admin UI requires reason and calls regenerate action', () => {
   assert.match(adminSource, /apiRequest\('regenerateSubmissionPdf'/);
   assert.match(adminSource, /acknowledgeSignedFormImpact/);
   assert.match(adminSource, /window\.confirm/);
+  assert.match(adminSource, /signedFormSuperseded/);
+  assert.match(adminSource, /document-version-chip/);
 });
 
 test('versions are bumped for regenerate release', () => {
