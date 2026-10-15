@@ -38,8 +38,11 @@ function generateSubmissionPdf_(submissionId, requestId, options) {
     replaceDocumentPlaceholders_(document, replacements);
     document.saveAndClose();
 
-    const pdfName = context.submission.SubmissionNo + '_Drug_Formulary_Submission_Unsigned_v' +
-      String(pdfVersion).padStart(2, '0') + '.pdf';
+    const pdfName = buildGeneratedPdfFileName_(
+      context.submission.BrandName,
+      context.submission.GenericName,
+      pdfVersion
+    );
     const pdfBlob = DriveApp.getFileById(workingFile.getId())
       .getAs(MimeType.PDF)
       .setName(pdfName);
@@ -127,6 +130,23 @@ function generateSubmissionPdf_(submissionId, requestId, options) {
  * Retry is kept for the failure-recovery path. A successful retry returns the
  * submission to AWAITING_SIGNATURE as before.
  */
+function buildGeneratedPdfFileName_(brandName, genericName, version) {
+  const sourceName = String(brandName || genericName || 'Drug').trim();
+  let safeName = sourceName
+    .replace(/[\\\/:*?"<>|\u0000-\u001F]/g, ' ')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^[._-]+|[._-]+$/g, '');
+
+  if (!safeName) {
+    safeName = 'Drug';
+  }
+  safeName = safeName.slice(0, 80);
+
+  return 'Drug_Formulary_Submission_' + safeName + '_v' +
+    String(version || 1).padStart(2, '0') + '.pdf';
+}
+
 function retryGeneratePdf_(payload, requestId) {
   requireFields_(payload, ['submissionId'], 'payload');
   const submission = findFirstObject_(
