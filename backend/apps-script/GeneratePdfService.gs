@@ -1,97 +1,315 @@
 /**
  * Generate PDF from approved Google Docs template.
  */
-function generateSubmissionPdf_(submissionId, requestId) {
+function generateSubmissionPdf_(submissionId, requestId, options) {
+  options = options || {};
   const context = getSubmissionContext_(submissionId);
   const settings = getSystemSettings_();
   const templateId = String(settings.ACTIVE_PDF_TEMPLATE_ID || '');
   if (!templateId) {
     throw appError_('PDF_TEMPLATE_NOT_CONFIGURED', 'ยังไม่ได้กำหนด ACTIVE_PDF_TEMPLATE_ID');
   }
+
+  const generationMode = String(options.mode || 'INITIAL').trim().toUpperCase() || 'INITIAL';
+  const generationReason = String(options.reason || '').trim();
+  const generatedBy = String(options.actorEmail || getActorEmail_() || 'SYSTEM').trim() || 'SYSTEM';
   const referenceDate = new Date();
   const chairperson = getActiveSignatory_(SIGNATORY_ROLE.PTC_CHAIRPERSON, referenceDate);
   const director = getActiveSignatory_(SIGNATORY_ROLE.HOSPITAL_DIRECTOR, referenceDate);
   const folderTree = JSON.parse(String(context.submission.FolderMapJSON));
   const outputFolder = DriveApp.getFolderById(folderTree.folders.GENERATED_PHYSICIAN_FORM.id);
   const templateFile = DriveApp.getFileById(templateId);
+
   if (templateFile.getMimeType() !== MimeType.GOOGLE_DOCS) {
     throw appError_('INVALID_TEMPLATE_TYPE', 'Template ต้องเป็น Google Docs');
   }
-  const pdfVersion = getNextGeneratedDocumentVersion_(submissionId, DOCUMENT_TYPE.GENERATED_PHYSICIAN_FORM);
-  const workingName = context.submission.SubmissionNo + '_Template_Working_v' + String(pdfVersion).padStart(2, '0');
+
+  const pdfVersion = getNextGeneratedDocumentVersion_(
+    submissionId,
+    DOCUMENT_TYPE.GENERATED_PHYSICIAN_FORM
+  );
+  const workingName = context.submission.SubmissionNo + '_Template_Working_v' +
+    String(pdfVersion).padStart(2, '0');
   const workingFile = templateFile.makeCopy(workingName, outputFolder);
-  const document = DocumentApp.openById(workingFile.getId());
-  const replacements = buildTemplateReplacements_(context, chairperson, director);
-  replaceDocumentPlaceholders_(document, replacements);
-  document.saveAndClose();
-  const pdfName = context.submission.SubmissionNo + '_Drug_Formulary_Submission_Unsigned_v' +
-    String(pdfVersion).padStart(2, '0') + '.pdf';
-  const pdfBlob = DriveApp.getFileById(workingFile.getId()).getAs(MimeType.PDF).setName(pdfName);
-  const pdfFile = outputFolder.createFile(pdfBlob);
-  workingFile.setTrashed(true);
-  const generatedDocumentId = Utilities.getUuid();
-  appendObject_(getSheet_('GeneratedDocuments'), {
-    GeneratedDocumentID: generatedDocumentId,
-    SubmissionID: submissionId,
-    DocumentType: DOCUMENT_TYPE.GENERATED_PHYSICIAN_FORM,
-    DocumentVersion: pdfVersion,
-    DriveFileID: pdfFile.getId(),
-    DriveFileURL: pdfFile.getUrl(),
-    GeneratedAt: new Date(),
-    GeneratedBy: getActorEmail_(),
-    TemplateFileID: templateId,
-    PTCChairpersonNameSnapshot: chairperson.DisplayName,
-    PTCChairpersonTitleSnapshot: chairperson.PositionTitleTH,
-    HospitalDirectorNameSnapshot: director.DisplayName,
-    HospitalDirectorTitleSnapshot: director.PositionTitleTH,
-    SignatoryReferenceDate: referenceDate,
-    SourceManifestJSON: JSON.stringify({
-      requestId: requestId,
-      submissionId: submissionId,
-      templateId: templateId
-    }),
-    Status: 'GENERATED',
-    ErrorMessage: ''
-  });
-  appendObject_(getSheet_('Documents'), {
-    DocumentID: Utilities.getUuid(),
-    SubmissionID: submissionId,
-    DocumentType: DOCUMENT_TYPE.GENERATED_PHYSICIAN_FORM,
-    DocumentVersion: pdfVersion,
-    OriginalFileName: pdfName,
-    StoredFileName: pdfName,
-    MimeType: MimeType.PDF,
-    FileSizeBytes: pdfBlob.getBytes().length,
-    DriveFileID: pdfFile.getId(),
-    DriveFolderID: outputFolder.getId(),
-    DriveFileURL: pdfFile.getUrl(),
-    FileHash: computeSha256_(pdfBlob.getBytes()),
-    UploadedBy: 'SYSTEM',
-    UploadedAt: new Date(),
-    ReviewStatus: 'GENERATED',
-    ReviewNote: '',
-    IsCurrentVersion: true
-  });
-  updateFirstMatch_(getSheet_('Submissions'), 'SubmissionID', submissionId, {
-    GeneratedPdfFileID: pdfFile.getId(),
-    GeneratedPdfURL: pdfFile.getUrl(),
-    UpdatedAt: new Date()
-  });
-  return {
-    success: true,
-    generatedDocumentId: generatedDocumentId,
-    version: pdfVersion,
-    fileId: pdfFile.getId(),
-    fileName: pdfName,
-    fileUrl: pdfFile.getUrl()
-  };
+
+  try {
+    const document = DocumentApp.openById(workingFile.getId());
+    const replacements = buildTemplateReplacements_(context, chairperson, director);
+    replaceDocumentPlaceholders_(document, replacements);
+    document.saveAndClose();
+
+    const pdfName = context.submission.SubmissionNo + '_Drug_Formulary_Submission_Unsigned_v' +
+      String(pdfVersion).padStart(2, '0') + '.pdf';
+    const pdfBlob = DriveApp.getFileById(workingFile.getId())
+      .getAs(MimeType.PDF)
+      .setName(pdfName);
+    const pdfFile = outputFolder.createFile(pdfBlob);
+
+    const generatedDocumentId = Utilities.getUuid();
+    appendObject_(getSheet_('GeneratedDocuments'), {
+      GeneratedDocumentID: generatedDocumentId,
+      SubmissionID: submissionId,
+      DocumentType: DOCUMENT_TYPE.GENERATED_PHYSICIAN_FORM,
+      DocumentVersion: pdfVersion,
+      DriveFileID: pdfFile.getId(),
+      DriveFileURL: pdfFile.getUrl(),
+      GeneratedAt: new Date(),
+      GeneratedBy: generatedBy,
+      TemplateFileID: templateId,
+      PTCChairpersonNameSnapshot: chairperson.DisplayName,
+      PTCChairpersonTitleSnapshot: chairperson.PositionTitleTH,
+      HospitalDirectorNameSnapshot: director.DisplayName,
+      HospitalDirectorTitleSnapshot: director.PositionTitleTH,
+      SignatoryReferenceDate: referenceDate,
+      SourceManifestJSON: JSON.stringify({
+        requestId: requestId,
+        submissionId: submissionId,
+        templateId: templateId,
+        generationMode: generationMode,
+        generationReason: generationReason,
+        sourceStatus: context.submission.CurrentStatus || ''
+      }),
+      Status: 'GENERATED',
+      ErrorMessage: ''
+    });
+
+    const documentId = Utilities.getUuid();
+    appendObject_(getSheet_('Documents'), {
+      DocumentID: documentId,
+      SubmissionID: submissionId,
+      DocumentType: DOCUMENT_TYPE.GENERATED_PHYSICIAN_FORM,
+      DocumentVersion: pdfVersion,
+      OriginalFileName: pdfName,
+      StoredFileName: pdfName,
+      MimeType: MimeType.PDF,
+      FileSizeBytes: pdfBlob.getBytes().length,
+      DriveFileID: pdfFile.getId(),
+      DriveFolderID: outputFolder.getId(),
+      DriveFileURL: pdfFile.getUrl(),
+      FileHash: computeSha256_(pdfBlob.getBytes()),
+      UploadedBy: generatedBy,
+      UploadedAt: new Date(),
+      ReviewStatus: 'GENERATED',
+      ReviewNote: generationReason,
+      IsCurrentVersion: true
+    });
+
+    markPreviousGeneratedPdfVersionsNotCurrent_(submissionId, documentId);
+
+    updateFirstMatch_(getSheet_('Submissions'), 'SubmissionID', submissionId, {
+      GeneratedPdfFileID: pdfFile.getId(),
+      GeneratedPdfURL: pdfFile.getUrl(),
+      UpdatedAt: new Date()
+    });
+
+    return {
+      success: true,
+      generatedDocumentId: generatedDocumentId,
+      documentId: documentId,
+      version: pdfVersion,
+      fileId: pdfFile.getId(),
+      fileName: pdfName,
+      fileUrl: pdfFile.getUrl(),
+      generationMode: generationMode,
+      reason: generationReason,
+      sourceStatus: context.submission.CurrentStatus || ''
+    };
+  } finally {
+    try {
+      workingFile.setTrashed(true);
+    } catch (cleanupError) {
+      console.warn('ไม่สามารถลบ Working Google Docs: ' + cleanupError.message);
+    }
+  }
 }
+
+/**
+ * Retry is kept for the failure-recovery path. A successful retry returns the
+ * submission to AWAITING_SIGNATURE as before.
+ */
 function retryGeneratePdf_(payload, requestId) {
   requireFields_(payload, ['submissionId'], 'payload');
-  const result = generateSubmissionPdf_(payload.submissionId, requestId);
-  updateSubmissionStatusInternal_(payload.submissionId, STATUS.AWAITING_SIGNATURE, payload.__actorEmail || getActorEmail_(), 'Retry สร้าง PDF สำเร็จ');
+  const submission = findFirstObject_(
+    getSheet_('Submissions'),
+    'SubmissionID',
+    payload.submissionId
+  );
+  if (!submission) {
+    throw appError_('SUBMISSION_NOT_FOUND', 'ไม่พบคำขอ');
+  }
+  if (String(submission.CurrentStatus || '') !== STATUS.PDF_GENERATION_FAILED) {
+    throw appError_(
+      'PDF_RETRY_NOT_ALLOWED',
+      'Retry PDF ใช้ได้เฉพาะคำขอที่อยู่ในสถานะ PDF_GENERATION_FAILED'
+    );
+  }
+
+  const actorEmail = payload.__actorEmail || getActorEmail_();
+  const result = generateSubmissionPdf_(payload.submissionId, requestId, {
+    mode: 'RETRY',
+    reason: String(payload.reason || 'Retry หลังสร้าง PDF ไม่สำเร็จ').trim(),
+    actorEmail: actorEmail
+  });
+
+  updateSubmissionStatusInternal_(
+    payload.submissionId,
+    STATUS.AWAITING_SIGNATURE,
+    actorEmail,
+    'Retry สร้าง PDF สำเร็จ'
+  );
   return result;
 }
+
+/**
+ * Regenerate a new unsigned PDF from the data already persisted for a
+ * submission. Previous PDF versions are retained for audit/history and the
+ * normal workflow status is preserved unless a signed form must be superseded
+ * or the submission is recovering from PDF_GENERATION_FAILED.
+ */
+function regenerateSubmissionPdf_(payload, requestId) {
+  requireFields_(payload, ['submissionId', 'reason'], 'payload');
+
+  const reason = String(payload.reason || '').trim();
+  if (reason.length < 3) {
+    throw appError_(
+      'REGENERATION_REASON_REQUIRED',
+      'กรุณาระบุเหตุผลในการสร้าง PDF ใหม่'
+    );
+  }
+  if (reason.length > 500) {
+    throw appError_(
+      'REGENERATION_REASON_TOO_LONG',
+      'เหตุผลในการสร้าง PDF ใหม่ต้องไม่เกิน 500 ตัวอักษร'
+    );
+  }
+
+  const submission = findFirstObject_(
+    getSheet_('Submissions'),
+    'SubmissionID',
+    payload.submissionId
+  );
+  if (!submission) {
+    throw appError_('SUBMISSION_NOT_FOUND', 'ไม่พบคำขอ');
+  }
+
+  const blockedStatuses = [
+    STATUS.APPROVED,
+    STATUS.REJECTED,
+    STATUS.WITHDRAWN,
+    STATUS.CANCELLED
+  ];
+  if (blockedStatuses.indexOf(String(submission.CurrentStatus || '')) !== -1) {
+    throw appError_(
+      'REGENERATE_NOT_ALLOWED_FOR_STATUS',
+      'ไม่อนุญาตให้สร้าง PDF ใหม่เมื่อคำขออยู่ในสถานะ ' + submission.CurrentStatus
+    );
+  }
+
+  const signedFormReceived = toBoolean_(submission.SignedFormReceived);
+  if (signedFormReceived && !toBoolean_(payload.acknowledgeSignedFormImpact)) {
+    throw appError_(
+      'SIGNED_FORM_REGENERATION_CONFIRMATION_REQUIRED',
+      'คำขอนี้มีแบบฟอร์มที่ลงนามแล้ว กรุณายืนยันผลกระทบก่อนสร้าง PDF ใหม่'
+    );
+  }
+
+  const actorEmail = payload.__actorEmail || getActorEmail_();
+  const previousStatus = String(submission.CurrentStatus || '');
+  const result = generateSubmissionPdf_(payload.submissionId, requestId, {
+    mode: 'REGENERATE',
+    reason: reason,
+    actorEmail: actorEmail
+  });
+
+  let resultingStatus = previousStatus;
+  let signedFormSuperseded = false;
+
+  if (signedFormReceived) {
+    supersedeCurrentSignedPhysicianForms_(
+      payload.submissionId,
+      result.version,
+      reason
+    );
+    updateFirstMatch_(getSheet_('Submissions'), 'SubmissionID', payload.submissionId, {
+      SignedFormReceived: false,
+      UpdatedAt: new Date()
+    });
+    updateSubmissionStatusInternal_(
+      payload.submissionId,
+      STATUS.AWAITING_SIGNATURE,
+      actorEmail,
+      'Regenerate PDF v' + result.version + ' ต้องลงนามใหม่: ' + reason
+    );
+    resultingStatus = STATUS.AWAITING_SIGNATURE;
+    signedFormSuperseded = true;
+  } else if (previousStatus === STATUS.PDF_GENERATION_FAILED) {
+    updateSubmissionStatusInternal_(
+      payload.submissionId,
+      STATUS.AWAITING_SIGNATURE,
+      actorEmail,
+      'Regenerate PDF สำเร็จ: ' + reason
+    );
+    resultingStatus = STATUS.AWAITING_SIGNATURE;
+  }
+
+  auditLog_(
+    actorEmail,
+    'regenerateSubmissionPdf',
+    'Submission',
+    payload.submissionId,
+    requestId,
+    {
+      reason: reason,
+      generatedVersion: result.version,
+      templateFileId: String(getSystemSettings_().ACTIVE_PDF_TEMPLATE_ID || ''),
+      previousStatus: previousStatus,
+      resultingStatus: resultingStatus,
+      signedFormReceivedBeforeRegenerate: signedFormReceived,
+      signedFormSuperseded: signedFormSuperseded
+    }
+  );
+
+  result.previousStatus = previousStatus;
+  result.currentStatus = resultingStatus;
+  result.signedFormReceivedBeforeRegenerate = signedFormReceived;
+  result.signedFormSuperseded = signedFormSuperseded;
+  return result;
+}
+
+function supersedeCurrentSignedPhysicianForms_(submissionId, generatedPdfVersion, reason) {
+  const sheet = getSheet_('Documents');
+  const rows = findObjects_(sheet, function (row) {
+    return String(row.SubmissionID) === String(submissionId) &&
+      String(row.DocumentType) === String(DOCUMENT_TYPE.SIGNED_PHYSICIAN_FORM) &&
+      toBoolean_(row.IsCurrentVersion);
+  });
+
+  rows.forEach(function (row) {
+    updateRowByNumber_(sheet, row.__rowNumber, {
+      ReviewStatus: 'SUPERSEDED',
+      ReviewNote: 'Superseded by regenerated unsigned PDF v' +
+        String(generatedPdfVersion).padStart(2, '0') + ': ' + reason,
+      IsCurrentVersion: false
+    });
+  });
+}
+
+function markPreviousGeneratedPdfVersionsNotCurrent_(submissionId, currentDocumentId) {
+  const sheet = getSheet_('Documents');
+  const rows = findObjects_(sheet, function (row) {
+    return String(row.SubmissionID) === String(submissionId) &&
+      String(row.DocumentType) === String(DOCUMENT_TYPE.GENERATED_PHYSICIAN_FORM) &&
+      String(row.DocumentID) !== String(currentDocumentId) &&
+      toBoolean_(row.IsCurrentVersion);
+  });
+
+  rows.forEach(function (row) {
+    updateRowByNumber_(sheet, row.__rowNumber, {
+      IsCurrentVersion: false
+    });
+  });
+}
+
 function getNextGeneratedDocumentVersion_(submissionId, documentType) {
   const rows = findObjects_(getSheet_('GeneratedDocuments'), function (row) {
     return String(row.SubmissionID) === String(submissionId) &&

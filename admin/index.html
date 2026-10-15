@@ -142,9 +142,23 @@
       </section>
       <section class="detail-section">
         <div class="section-row">
-          <h3>เอกสารประกอบ</h3>
-          <button id="retry-pdf-button" type="button" class="secondary-button">สร้าง PDF ใหม่</button>
+          <div>
+            <h3>เอกสารประกอบ</h3>
+            <p class="muted small">สามารถ Regenerate PDF จากข้อมูลที่บันทึกในคำขอนี้ โดยระบบจะเก็บ PDF เวอร์ชันเดิมไว้</p>
+          </div>
         </div>
+        <form id="regenerate-pdf-form" class="stack-form regenerate-pdf-form">
+          <label class="field">
+            <span>เหตุผลในการสร้าง PDF ใหม่ *</span>
+            <textarea id="regenerate-pdf-reason" rows="2" maxlength="500" placeholder="เช่น ปรับ Template ใหม่ / แก้ไขข้อมูลหลังตรวจสอบ" required></textarea>
+          </label>
+          <p id="regenerate-pdf-warning" class="warning-note hidden">
+            คำขอนี้มีแบบฟอร์มที่ลงนามแล้ว เมื่อ Regenerate ระบบจะเก็บไฟล์ลงนามเดิมเป็นประวัติ เปลี่ยนเป็น Superseded และให้คำขอกลับไปรอลงนาม PDF ฉบับใหม่
+          </p>
+          <div class="regenerate-pdf-actions">
+            <button id="regenerate-pdf-button" type="submit" class="secondary-button">Regenerate PDF</button>
+          </div>
+        </form>
         <div id="document-list" class="document-list"></div>
       </section>
       <section class="detail-section">

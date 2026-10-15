@@ -396,20 +396,40 @@ function renderDetail(detail) {
     </div>`;
   newStatusSelect.value = submission.CurrentStatus || 'DOCUMENT_REVIEW';
   updateRejectReasonVisibility();
+
+  const regenerateReason = document.querySelector('#regenerate-pdf-reason');
+  const regenerateWarning = document.querySelector('#regenerate-pdf-warning');
+  if (regenerateReason) regenerateReason.value = '';
+  const signedFormReceived = submission.SignedFormReceived === true ||
+    String(submission.SignedFormReceived || '').toUpperCase() === 'TRUE';
+  regenerateWarning?.classList.toggle('hidden', !signedFormReceived);
+
   renderDocuments(detail.documents || []);
   renderHistory(detail.statusHistory || []);
 }
 
 function renderDocuments(documents) {
-  documentList.innerHTML = documents.length ? documents.map(document => `
-    <article class="document-item">
-      <div>
-        <strong>${escapeHtml(document.documentType)} · v${Number(document.documentVersion || 0)}</strong>
-        <span>${escapeHtml(document.storedFileName || document.originalFileName)} · ${escapeHtml(formatBytes(document.fileSizeBytes))}</span>
-      </div>
-      <button type="button" class="secondary-button" data-download-document="${escapeHtml(document.documentId)}">ดาวน์โหลด</button>
-    </article>
-  `).join('') : '<p class="muted">ไม่พบเอกสาร</p>';
+  documentList.innerHTML = documents.length ? documents.map(document => {
+    const currentChip = document.isCurrentVersion
+      ? '<span class="document-version-chip">Current</span>'
+      : '';
+    const supersededChip = String(document.reviewStatus || '').toUpperCase() === 'SUPERSEDED'
+      ? '<span class="document-version-chip document-version-chip--superseded">Superseded</span>'
+      : '';
+    const reviewNote = document.reviewNote
+      ? `<span class="document-review-note">${escapeHtml(document.reviewNote)}</span>`
+      : '';
+
+    return `
+      <article class="document-item">
+        <div>
+          <strong>${escapeHtml(document.documentType)} · v${Number(document.documentVersion || 0)} ${currentChip} ${supersededChip}</strong>
+          <span>${escapeHtml(document.storedFileName || document.originalFileName)} · ${escapeHtml(formatBytes(document.fileSizeBytes))}</span>
+          ${reviewNote}
+        </div>
+        <button type="button" class="secondary-button" data-download-document="${escapeHtml(document.documentId)}">ดาวน์โหลด</button>
+      </article>`;
+  }).join('') : '<p class="muted">ไม่พบเอกสาร</p>';
   documentList.querySelectorAll('[data-download-document]').forEach(button => {
     button.addEventListener('click', () => downloadDocument(button.dataset.downloadDocument, button));
   });
@@ -504,20 +524,49 @@ async function handleSignedUpload(event) {
   }
 }
 
-async function retryPdf() {
-  if (!state.selectedSubmissionId) return;
-  const button = document.querySelector('#retry-pdf-button');
+async function regeneratePdf(event) {
+  event.preventDefault();
+  if (!state.selectedSubmissionId || !state.selectedDetail) return;
+
+  const reasonInput = document.querySelector('#regenerate-pdf-reason');
+  const button = document.querySelector('#regenerate-pdf-button');
+  const reason = reasonInput.value.trim();
+  if (reason.length < 3) {
+    showAlert('กรุณาระบุเหตุผลในการสร้าง PDF ใหม่');
+    reasonInput.focus();
+    return;
+  }
+
+  const submission = state.selectedDetail.submission || {};
+  const signedFormReceived = submission.SignedFormReceived === true ||
+    String(submission.SignedFormReceived || '').toUpperCase() === 'TRUE';
+
+  const confirmationMessage = signedFormReceived
+    ? 'คำขอนี้มีแบบฟอร์มที่ลงนามแล้ว หาก Regenerate ระบบจะเก็บไฟล์เดิมเป็น Superseded และเปลี่ยนสถานะกลับเป็นรอลงนาม PDF ฉบับใหม่ ต้องการดำเนินการต่อหรือไม่?'
+    : 'ต้องการสร้าง PDF เวอร์ชันใหม่จากข้อมูลที่บันทึกในคำขอนี้หรือไม่? PDF เวอร์ชันเดิมจะยังถูกเก็บไว้';
+
+  if (!window.confirm(confirmationMessage)) return;
+
   button.disabled = true;
-  button.textContent = 'กำลังสร้าง…';
+  button.textContent = 'กำลัง Regenerate…';
   try {
-    await apiRequest('retryGeneratePdf', { submissionId: state.selectedSubmissionId });
-    showToast('สร้าง PDF ใหม่สำเร็จ');
+    const result = await apiRequest('regenerateSubmissionPdf', {
+      submissionId: state.selectedSubmissionId,
+      reason,
+      acknowledgeSignedFormImpact: signedFormReceived
+    });
+    showToast(
+      result.signedFormSuperseded
+        ? `Regenerate PDF v${String(result.version || '').padStart(2, '0')} สำเร็จ · ต้องลงนามใหม่`
+        : `Regenerate PDF v${String(result.version || '').padStart(2, '0')} สำเร็จ`
+    );
+    reasonInput.value = '';
     await Promise.all([loadDashboard(), openDetail(state.selectedSubmissionId)]);
   } catch (error) {
     showAlert(error.message);
   } finally {
     button.disabled = false;
-    button.textContent = 'สร้าง PDF ใหม่';
+    button.textContent = 'Regenerate PDF';
   }
 }
 
@@ -551,7 +600,7 @@ function bindEvents() {
   detailBackdrop.addEventListener('click', closeDetail);
   document.querySelector('#status-update-form').addEventListener('submit', handleStatusUpdate);
   document.querySelector('#signed-upload-form').addEventListener('submit', handleSignedUpload);
-  document.querySelector('#retry-pdf-button').addEventListener('click', retryPdf);
+  document.querySelector('#regenerate-pdf-form').addEventListener('submit', regeneratePdf);
   newStatusSelect.addEventListener('change', updateRejectReasonVisibility);
   document.addEventListener('keydown', event => {
     if (event.key !== 'Escape') return;

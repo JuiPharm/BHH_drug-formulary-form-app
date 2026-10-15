@@ -1,13 +1,13 @@
-# Google Apps Script Backend — v1.3.3
+# Google Apps Script Backend — v1.3.4
 Source snapshot ของ Backend สำหรับระบบ **BHH Drug Formulary Registration**  
 Google Apps Script project: `1L2bGjBd7pXgR3UN9bGUWRcrbHhcfANKR1dOLmK7imZPaNrJk6dEsBs-e`
 โฟลเดอร์นี้เป็น source version-control ของ Apps Script ฝั่ง Backend โดยไฟล์ `.gs`
 แต่ละไฟล์ตรงกับไฟล์ใน Apps Script project
 ## Version
-- Backend: `v1.3.3`
+- Backend: `v1.3.4`
 - Form: `FM-02.2-PTC-004 Rev.13 (11/07/2024)`
 - Frontend ที่ออกแบบให้ทำงานร่วมกัน: `v1.3.3`
-## v1.3.3 changes
+## v1.3.4 changes
 - รองรับ `ProductDetails.OtherClinicalInformation` สำหรับ Clinical Pharmacology 6.13
 - รองรับ structured physician proposal:
   - `UrgencyAmount`
@@ -25,6 +25,13 @@ Google Apps Script project: `1L2bGjBd7pXgR3UN9bGUWRcrbHhcfANKR1dOLmK7imZPaNrJk6d
 - PDF generator รองรับ `{{OtherClinicalInformation}}`
 - ใช้ RMP ตาม PTC-004 Rev.13
 - E2E test payload ปรับให้ผ่าน validation และ document extension rules ปัจจุบัน
+- เพิ่ม `regenerateSubmissionPdf` สำหรับสร้าง PDF เวอร์ชันใหม่จากข้อมูลที่บันทึกแล้ว
+- Regenerate เก็บ PDF เวอร์ชันเดิมไว้และ mark เฉพาะเวอร์ชันล่าสุดเป็น `IsCurrentVersion = TRUE`
+- Regenerate ใช้ Active PDF Template และ Active signatories ณ เวลาที่สร้างฉบับใหม่
+- Regenerate ต้องระบุเหตุผล และบันทึก generation mode/reason/source status ใน `SourceManifestJSON`
+- Regenerate ไม่เปลี่ยน workflow status ยกเว้นกรณีเดิมเป็น `PDF_GENERATION_FAILED` ซึ่งจะกลับไป `AWAITING_SIGNATURE`
+- `retryGeneratePdf` เดิมถูกจำกัดให้ใช้เฉพาะ `PDF_GENERATION_FAILED`; งานสร้างฉบับใหม่ทั่วไปให้ใช้ `regenerateSubmissionPdf`
+- ถ้ามี Signed Form แล้ว ต้องยืนยันผลกระทบก่อน Regenerate; ระบบจะเก็บ Signed Form เดิมเป็น `SUPERSEDED`, ตั้ง `SignedFormReceived = FALSE` และกลับไป `AWAITING_SIGNATURE` เพื่อให้ลงนามฉบับใหม่
 ## Files
 - `Code.gs` — public entry points / setup helpers
 - `Config.gs` — constants, schema, settings, placeholders
@@ -46,7 +53,7 @@ Google Apps Script project: `1L2bGjBd7pXgR3UN9bGUWRcrbHhcfANKR1dOLmK7imZPaNrJk6d
 3. Run `validateSystemSetup()`.
 4. Confirm `SystemSettings.ADMIN_NOTIFICATION_EMAILS` before any E2E test that sends real mail.
 5. Deploy **Manage deployments → Edit → New version** and keep the existing `/exec` URL.
-6. Verify `health` returns Backend version `1.3.3`.
+6. Verify `health` returns Backend version `1.3.4`.
 7. Register/switch the approved `Drug_Formulary_Submission_Rev13_v1.3.3` Google Docs template.
 8. Run one controlled submission and inspect the generated PDF.
 ## Email notifications

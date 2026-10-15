@@ -126,7 +126,18 @@ Resource ตัวอย่างแยกจาก `PI_TEMPLATE` / `PRESENTATIO
 
 Backend source is version-controlled under `backend/apps-script/`.
 
-The current backend snapshot is **v1.3.3** and is designed to work with Form App v1.3.3 and
+The current backend snapshot is **v1.3.4** and is designed to work with Form App v1.3.3 and
 `FM-02.2-PTC-004 Rev.13 (11/07/2024)`. Environment-specific Script Properties, credentials,
 tokens, and production settings are intentionally not stored in Git.
 
+
+
+## PDF Regeneration
+
+Admin App v1.2.0 รองรับการ Regenerate PDF จากข้อมูลที่บันทึกไว้ใน Submission โดยใช้ Backend v1.3.4
+ระบบจะสร้าง PDF เป็น version ถัดไปโดยไม่ลบไฟล์เดิม ต้องระบุเหตุผลในการสร้างใหม่ และจะไม่เปลี่ยน
+workflow status ปัจจุบันโดยอัตโนมัติ (ยกเว้น recovery จาก `PDF_GENERATION_FAILED`).
+
+หากคำขอมีแบบฟอร์มที่ลงนามแล้ว Admin ต้องยืนยันผลกระทบก่อนสร้าง PDF ฉบับใหม่ ระบบจะเก็บ
+Signed Form เดิมไว้เป็นประวัติและ mark เป็น `SUPERSEDED`, ตั้ง `SignedFormReceived = FALSE`
+และเปลี่ยนสถานะกลับเป็น `AWAITING_SIGNATURE` เพื่อให้แพทย์ลงนาม PDF version ใหม่
