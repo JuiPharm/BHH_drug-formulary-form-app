@@ -77,3 +77,55 @@ test('rejects oversized, invalid, and empty uploads before Google OAuth call', a
   }
   assert.equal(called, false);
 });
+
+test('files above 5 MiB use resumable upload session with trusted Google host', async () => {
+  const bytes = new Uint8Array(5 * 1024 * 1024 + 1);
+  bytes.set(new TextEncoder().encode('%PDF-'), 0);
+  let initCalled = false;
+  let putCalled = false;
+  const transport = async (url, options) => {
+    if (url.includes('oauth2.googleapis.com')) {
+      return Response.json({ access_token: 'MOCK-TOKEN' });
+    }
+    if (options.method === 'POST') {
+      assert(url.includes('uploadType=resumable'));
+      assert.equal(options.headers['x-upload-content-length'], String(bytes.length));
+      initCalled = true;
+      return new Response(null, {
+        status: 200,
+        headers: {
+          location: 'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=synthetic'
+        }
+      });
+    }
+    assert.equal(options.method, 'PUT');
+    assert.equal(options.body.length, bytes.length);
+    putCalled = true;
+    return Response.json({ id: 'resumable-synthetic-id' });
+  };
+  const result = await uploadDocumentToDrive(env, {
+    fileName: 'large.pdf', mimeType: 'application/pdf', bytes
+  }, transport);
+  assert.equal(initCalled, true);
+  assert.equal(putCalled, true);
+  assert.equal(result.fileId, 'resumable-synthetic-id');
+  assert.equal(result.sizeBytes, bytes.length);
+});
+
+test('resumable upload rejects an unexpected session URL before transmitting file', async () => {
+  let putCalled = false;
+  const bytes = new Uint8Array(5 * 1024 * 1024 + 1);
+  const transport = async (_url, options) => {
+    if (String(_url).includes('oauth2.googleapis.com')) return Response.json({ access_token: 'MOCK-TOKEN' });
+    if (options.method === 'POST') {
+      return new Response(null, {status: 200, headers: { location: 'https://untrusted.example.test/receive' } });
+    }
+    putCalled = true;
+    throw Error('must not happen');
+  };
+  await assert.rejects(
+    uploadDocumentToDrive(env, {fileName:'large.pdf',mimeType:'application/pdf',bytes}, transport),
+    /Invalid Drive resumable upload session location/
+  );
+  assert.equal(putCalled, false);
+});
