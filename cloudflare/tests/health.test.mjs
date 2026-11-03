@@ -26,9 +26,10 @@ test('write methods are denied until RBAC is implemented', async () => {
   const res = await worker.fetch(request('/api/submissions', { method: 'POST' }), env);
   assert.equal(res.status, 405);
 });
-test('unknown routes have no implicit admin data access', async () => {
+test('admin endpoints fail closed when Cloudflare Access is not configured', async () => {
   const res = await worker.fetch(request('/api/admin/submissions'), env);
-  assert.equal(res.status, 404);
+  assert.equal(res.status, 503);
+  assert.deepEqual(await res.json(), { error: 'ADMIN_AUTH_NOT_CONFIGURED' });
 });
 test('CORS allowlist only includes the existing GitHub Pages origin', async () => {
   const valid = await worker.fetch(request('/api/public/config', { headers: { origin: 'https://juipharm.github.io' } }), env);
