@@ -119,3 +119,18 @@ function doPost(e) {
   }
   return routeApiRequest_(request, e);
 }
+
+/**
+ * V2 bootstrap: Run once MANUALLY from the Apps Script editor as the
+ * production project's authorized owner, after reviewing AdminUsers.
+ * This function is NOT exposed by routeApiRequest_ / public Web App API.
+ * Do not auto-promote any user during web authentication.
+ */
+function bootstrapOwnerSuperAdminV2() {
+  return bootstrapOwnerSuperAdmin_();
+}
+
+/** V2: preview counts/relationships only. Run from new Apps Script project editor. */
+function previewV2DataMigration() { return previewV2Migration_(); }
+/** V2: one-time gated copy after V1 maintenance freeze. Editor-only. */
+function runV2DataMigration() { return runV2Migration_(); }

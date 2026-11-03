@@ -24,14 +24,14 @@ const requiredFields = [
   'physicianDepartment',
   'physicianSpecialty',
   'urgency',
-  'urgencyDuration',
-  'proposalReason'
+  'urgencyDuration'
 ];
 
 for (const field of requiredFields) {
   assert.equal(isRequired(field), true, `${field} must be required`);
 }
 
+assert.match(appSource, /syncProposalReason\(\)/, 'structured proposal reasons are validated in JavaScript');
 assert.equal(isRequired('physicianPhone'), false, 'physicianPhone must remain optional');
 assert.match(html, /แพทย์ผู้เสนอ\s*—\s*Required/);
 assert.match(html, /ผู้เห็นชอบ\s*—\s*Optional\s*สูงสุด\s*6\s*คน/);

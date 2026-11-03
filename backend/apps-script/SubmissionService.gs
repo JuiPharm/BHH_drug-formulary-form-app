@@ -104,7 +104,16 @@ function submitApplication_(payload, requestId) {
         error: normalizeError_(pdfError)
       };
     }
-    sendSubmissionEmails_(submissionId, payload, pdfResult, submissionAccessToken);
+    try {
+      sendSubmissionEmails_(submissionId, payload, pdfResult, submissionAccessToken);
+    } catch (emailError) {
+      // The submission, documents and generated PDF already exist.
+      // Notification errors must never destroy a completed submission.
+      console.error('Submission notification failed for ' + submissionNo + ': ' +
+        String(emailError && emailError.message || emailError));
+      auditLog_('SYSTEM', 'submissionNotificationError', 'Submission', submissionId,
+        requestId, { message: String(emailError && emailError.message || emailError) });
+    }
     return {
       submissionId: submissionId,
       submissionNo: submissionNo,

@@ -1,7 +1,7 @@
 export const ADMIN_APP_CONFIG = Object.freeze({
-  API_URL: 'https://script.google.com/macros/s/AKfycbx1AN9051Amkcfc9RDIkBQJXkxG0M-IGOJ_1m6aWqctbW_z6f7PhXqEKdP1Wjd9kgNx4A/exec',
+  API_URL: 'V2_GAS_DEPLOYMENT_NOT_CONFIGURED',
   REQUEST_TIMEOUT_MS: 240000,
-  SESSION_KEY: 'drug-formulary-admin-session-v1',
-  APP_VERSION: '1.2.0',
+  SESSION_KEY: 'drug-formulary-admin-session-v2',
+  APP_VERSION: '2.0.0-rc.1',
   ENABLE_DEBUG: false
 });

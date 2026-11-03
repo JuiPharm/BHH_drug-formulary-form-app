@@ -8,6 +8,9 @@ function routeApiRequest_(request, event) {
   try {
     let data;
     switch (action) {
+      case 'cloudflareBridge':
+        data = processCloudflareBridge_(request);
+        break;
       case 'health':
         data = {
           app: APP.NAME,
@@ -34,6 +37,24 @@ function routeApiRequest_(request, event) {
       case 'changeAdminPassword':
         data = changeAdminPassword_(request, payload, requestId);
         break;
+      case 'listManagedAdminUsers':
+        data = listManagedAdminUsers_(request);
+        break;
+      case 'createManagedAdminUser':
+        data = createManagedAdminUser_(request, payload, requestId);
+        break;
+      case 'updateManagedAdminUser':
+        data = updateManagedAdminUser_(request, payload, requestId);
+        break;
+      case 'disableManagedAdminUser':
+        data = disableManagedAdminUser_(request, payload, requestId);
+        break;
+      case 'resetManagedAdminPassword':
+        data = resetManagedAdminPassword_(request, payload, requestId);
+        break;
+      case 'unlockManagedAdminUser':
+        data = unlockManagedAdminUser_(request, payload, requestId);
+        break;
       case 'getAdminDashboardSummary':
         requireAdmin_(request);
         data = getAdminDashboardSummary_();
@@ -55,6 +76,7 @@ function routeApiRequest_(request, event) {
         break;
       case 'adminUploadSignedPhysicianForm': {
         const admin = requireAdmin_(request);
+        assertWorkflowWriterRole_(admin);
         payload.__actorEmail = admin.email;
         data = adminUploadSignedPhysicianForm_(payload, requestId);
         break;
@@ -67,12 +89,14 @@ function routeApiRequest_(request, event) {
         break;
       case 'retryGeneratePdf': {
         const admin = requireAdmin_(request);
+        assertWorkflowWriterRole_(admin);
         payload.__actorEmail = admin.email;
         data = retryGeneratePdf_(payload, requestId);
         break;
       }
       case 'regenerateSubmissionPdf': {
         const admin = requireAdmin_(request);
+        assertWorkflowWriterRole_(admin);
         payload.__actorEmail = admin.email;
         data = regenerateSubmissionPdf_(payload, requestId);
         break;
@@ -89,8 +113,16 @@ function routeApiRequest_(request, event) {
         requireAdmin_(request);
         data = downloadAdminDocument_(payload);
         break;
+      case 'addSubmissionComment': {
+        const admin = requireAdmin_(request);
+        assertWorkflowWriterRole_(admin);
+        payload.__actorEmail = admin.email;
+        data = addSubmissionComment_(payload, requestId);
+        break;
+      }
       case 'updateStatus': {
         const admin = requireAdmin_(request);
+        assertWorkflowWriterRole_(admin);
         payload.__actorEmail = admin.email;
         data = updateSubmissionStatus_(payload, requestId);
         break;

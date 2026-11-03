@@ -118,6 +118,7 @@ function setAdminPassword_(email, password) {
     PasswordSalt: salt,
     PasswordAlgorithm: ADMIN_PASSWORD_ALGORITHM,
     PasswordChangedAt: new Date(),
+    MustChangePassword: true,
     FailedLoginCount: 0,
     LockedUntil: '',
     UpdatedAt: new Date()
@@ -167,6 +168,7 @@ function getAdminProfileByEmail_(email) {
     role: String(admin.Role || ''),
     isActive: toBoolean_(admin.IsActive),
     passwordConfigured: Boolean(admin.PasswordHash && admin.PasswordSalt),
+    mustChangePassword: toBoolean_(admin.MustChangePassword),
     lastLoginAt: admin.LastLoginAt || null
   };
 }
@@ -241,7 +243,8 @@ function adminLogin_(payload, requestId) {
     admin: {
       email: email,
       displayName: String(admin.DisplayName || ''),
-      role: String(admin.Role || '')
+      role: String(admin.Role || ''),
+      mustChangePassword: toBoolean_(admin.MustChangePassword)
     }
   };
 }
@@ -275,7 +278,12 @@ function requireAdmin_(request) {
   const auth = request && request.auth ? request.auth : {};
   const mode = getAdminAuthMode_();
   if (auth.sessionToken && (mode === 'PASSWORD' || mode === 'BOTH')) {
-    return requirePasswordSessionAdmin_(request, String(auth.sessionToken));
+    const admin = requirePasswordSessionAdmin_(request, String(auth.sessionToken));
+    if (admin.mustChangePassword &&
+        ['getAdminProfile','changeAdminPassword','adminLogout'].indexOf(String(request.action || '')) < 0) {
+      throw appError_('PASSWORD_CHANGE_REQUIRED', 'กรุณาเปลี่ยน Password ชั่วคราวก่อนใช้งานระบบ');
+    }
+    return admin;
   }
   if (auth.idToken && (mode === 'GOOGLE' || mode === 'BOTH')) {
     return requireGoogleAdmin_(request, String(auth.idToken));
@@ -310,6 +318,7 @@ function requirePasswordSessionAdmin_(request, rawToken) {
     email: normalizeAdminEmail_(admin.Email),
     role: String(admin.Role || ''),
     displayName: String(admin.DisplayName || ''),
+    mustChangePassword: toBoolean_(admin.MustChangePassword),
     authType: 'PASSWORD'
   };
   return request.__admin;
@@ -364,6 +373,7 @@ function getAdminProfile_(request) {
     email: admin.email,
     displayName: admin.displayName,
     role: admin.role,
+    mustChangePassword: Boolean(admin.mustChangePassword),
     authType: admin.authType
   };
 }
@@ -417,6 +427,10 @@ function changeAdminPassword_(request, payload, requestId) {
   }
   validateAdminPasswordPolicy_(newPassword);
   setAdminPassword_(signedInAdmin.email, newPassword);
+  updateFirstMatch_(getSheet_('AdminUsers'), 'Email', signedInAdmin.email, {
+    MustChangePassword: false,
+    UpdatedAt: new Date()
+  });
   auditLog_(signedInAdmin.email, 'changeAdminPassword', 'AdminUser', signedInAdmin.email, requestId, {
     sessionsRevoked: true
   });

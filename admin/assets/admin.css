@@ -194,3 +194,9 @@ tbody tr:hover { background: #f8fbfd; }
   color: var(--warning) !important;
   font-size: .76rem !important;
 }
+
+/* Pre-production: persistent Note/Comment column */
+.comment-cell { max-width: 260px; min-width: 180px; overflow-wrap: anywhere; }
+.comment-cell span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.comment-cell small { display: block; color: var(--muted); margin-top: .3rem; }
+#comment-list { margin-top: 1rem; }
