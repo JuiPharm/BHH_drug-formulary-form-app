@@ -41,6 +41,8 @@ function sendSubmissionEmails_(submissionId, payload, pdfResult, submissionAcces
   });
 }
 function sendAndLogEmail_(submissionId, emailType, recipient, subject, body) {
+  let status = 'SUCCESS';
+  let errorMessage = '';
   try {
     MailApp.sendEmail({
       to: recipient,
@@ -48,24 +50,29 @@ function sendAndLogEmail_(submissionId, emailType, recipient, subject, body) {
       body: body,
       name: APP.NAME
     });
-    appendObject_(getSheet_('EmailLog'), {
-      EmailLogID: Utilities.getUuid(),
-      SubmissionID: submissionId,
-      EmailType: emailType,
-      RecipientEmail: recipient,
-      SentAt: new Date(),
-      Status: 'SUCCESS',
-      ErrorMessage: ''
-    });
   } catch (error) {
+    status = 'FAILED';
+    errorMessage = error && error.message ? String(error.message) : 'MailApp failure';
+  }
+  // Logging failure must not retroactively roll back a successfully submitted
+  // drug application or change a successfully delivered email to FAILED.
+  try {
     appendObject_(getSheet_('EmailLog'), {
       EmailLogID: Utilities.getUuid(),
       SubmissionID: submissionId,
       EmailType: emailType,
       RecipientEmail: recipient,
       SentAt: new Date(),
-      Status: 'FAILED',
-      ErrorMessage: error.message
+      Status: status,
+      ErrorMessage: errorMessage
     });
+  } catch (loggingError) {
+    console.error('EmailLog write failed for ' + emailType + ' submission ' +
+      String(submissionId) + ': ' + String(loggingError.message || loggingError));
   }
+  if (status === 'FAILED') {
+    console.error('MailApp send failed for submission ' + String(submissionId) +
+      ' (' + emailType + '): ' + errorMessage);
+  }
+  return { success: status === 'SUCCESS', status: status, recipient: recipient };
 }
