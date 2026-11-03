@@ -34,6 +34,10 @@ export function clearStoredSession() {
 }
 
 export async function apiRequest(action, payload = {}, options = {}) {
+  if (!ADMIN_APP_CONFIG.API_URL?.startsWith('https://script.google.com/macros/s/') ||
+      !ADMIN_APP_CONFIG.API_URL.endsWith('/exec')) {
+    throw new ApiError('API_URL_NOT_CONFIGURED', 'ยังไม่ได้ตั้งค่า Web App URL ของ V2 ใน admin/js/config.js');
+  }
   const controller = new AbortController();
   const timeout = window.setTimeout(
     () => controller.abort(),
