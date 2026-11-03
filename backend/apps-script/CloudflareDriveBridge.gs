@@ -36,7 +36,11 @@ function bridgeRootFolder_() {
   if (!stagingId || (originalId && stagingId === originalId)) {
     throw appError_('BRIDGE_STAGING_FOLDER_REQUIRED', 'Set a different staging folder from the production main folder');
   }
-  return DriveApp.getFolderById(stagingId);
+  const folder = DriveApp.getFolderById(stagingId);
+  if (!/preprod|preproduction|staging|sandbox/i.test(folder.getName())) {
+    throw appError_('BRIDGE_STAGING_FOLDER_REQUIRED', 'Staging folder name must identify the test environment');
+  }
+  return folder;
 }
 
 function verifyCloudflareBridgeRequest_(request) {
