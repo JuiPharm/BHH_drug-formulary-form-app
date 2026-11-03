@@ -230,7 +230,7 @@ const SHEET_SCHEMAS = Object.freeze({
   AdminUsers: [
     'Email', 'DisplayName', 'Role', 'PasswordHash', 'PasswordSalt',
     'PasswordAlgorithm', 'PasswordChangedAt', 'FailedLoginCount',
-    'LockedUntil', 'LastLoginAt', 'IsActive', 'CreatedAt', 'UpdatedAt'
+    'LockedUntil', 'LastLoginAt', 'IsActive', 'CreatedAt', 'UpdatedAt', 'MustChangePassword'
   ],
   AdminSessions: [
     'SessionID', 'TokenHash', 'Email', 'DisplayNameSnapshot', 'RoleSnapshot',
