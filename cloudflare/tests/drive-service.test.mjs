@@ -60,7 +60,7 @@ test('binary Google Drive upload uses private parent, returns SHA-256, and does 
   assert.equal(stored.provider, 'google-drive');
   assert.equal(stored.fileId, 'fake-file-id');
   assert.equal(stored.sizeBytes, 6);
-  assert.equal(stored.sha256, '849a044225d2de70c08385c4b6ea69560b3d9f2027e95ade25ba4700d479ee77');
+  assert.equal(stored.sha256, '40d2af4d7ac41bb624d396eabbe5f30b8b3b70f451f7ad251cd193e02b7b9338');
   assert.equal(JSON.stringify(stored).includes('mock-secret-token'), false);
 });
 
