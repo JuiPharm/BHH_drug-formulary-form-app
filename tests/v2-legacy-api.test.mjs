@@ -8,7 +8,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = p => readFileSync(path.join(root, p), 'utf8');
 
 function urlFrom(config) {
-  const match = config.match(/API_URL:\\s*['"]([^'"]+)['"]/);
+  const match = config.match(/API_URL:\s*['"]([^'"]+)['"]/);
   assert.ok(match, 'API_URL must be a literal value for static GitHub Pages');
   return match[1];
 }
