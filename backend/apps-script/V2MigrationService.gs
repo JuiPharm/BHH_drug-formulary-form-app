@@ -81,6 +81,25 @@ function previewV2Migration_() {
     note: 'ข้อมูลจริงจะถูกคัดลอกเฉพาะเมื่อผู้ดูแลอนุมัติ Cutover และสั่ง Run ขั้นตอนถัดไปจาก Apps Script Editor'
   };
 }
+function setV2SystemSettingOnCopy_(target, key, value) {
+  const sheet = target.getSheetByName('SystemSettings');
+  if (!sheet) throw appError_('V2_SYSTEM_SETTINGS_MISSING', 'Missing V2 SystemSettings');
+  const rows = sheet.getDataRange().getValues();
+  const headers = rows[0].map(String);
+  const keyColumn = headers.indexOf('SettingKey');
+  const valueColumn = headers.indexOf('SettingValue');
+  if (keyColumn < 0 || valueColumn < 0) {
+    throw appError_('V2_SYSTEM_SETTINGS_SCHEMA', 'Invalid V2 SystemSettings headers');
+  }
+  for (let i = 1; i < rows.length; i += 1) {
+    if (String(rows[i][keyColumn]) === key) {
+      sheet.getRange(i + 1, valueColumn + 1).setValue(value);
+      return;
+    }
+  }
+  throw appError_('V2_SETTING_NOT_FOUND', 'Missing V2 setting ' + key);
+}
+
 function scrubV2Authentication_(target) {
   const sessions = target.getSheetByName('AdminSessions');
   if (sessions && sessions.getLastRow() > 1) {
@@ -117,6 +136,12 @@ function runV2Migration_() {
     if (props.getProperty(PROP_KEYS.SPREADSHEET_ID)) {
       throw appError_('V2_TARGET_ALREADY_CONFIGURED', 'V2 มีฐานข้อมูลแล้ว ห้ามเขียนทับ');
     }
+    const v2FormUrl = String(props.getProperty('BHH_V2_FORM_APP_URL') || '').replace(/\\/$/, '');
+    if (!/^https:\/\/juipharm\.github\.io\/[A-Za-z0-9._-]+$/.test(v2FormUrl) ||
+        v2FormUrl === 'https://juipharm.github.io/BHH_drug-formulary-form-app') {
+      throw appError_('V2_FORM_URL_REQUIRED',
+        'กำหนด BHH_V2_FORM_APP_URL เป็น GitHub Pages URL ของ Repository V2 ที่ตรวจสอบแล้ว');
+    }
     const source = v2MigrationSource_();
     const preflight = v2MigrationIntegrity_(source);
     const parentFolder = DriveApp.getFileById(source.getId()).getParents();
@@ -143,6 +168,9 @@ function runV2Migration_() {
     const copy = SpreadsheetApp.openById(createdFile.getId());
     scrubV2Authentication_(copy);
     initializeSheets_(copy); // Adds any V2-only sheets such as SubmissionComments.
+    // V2 email receipts must point to the V2 Form App, NOT the old V1 URL.
+    setV2SystemSettingOnCopy_(copy, 'FORM_APP_URL', v2FormUrl);
+    setV2SystemSettingOnCopy_(copy, 'APP_VERSION', APP.VERSION);
     const postflight = v2MigrationIntegrity_(copy);
     V2_BUSINESS_SHEETS_.forEach(function (name) {
       if (preflight.counts[name] !== postflight.counts[name]) {
