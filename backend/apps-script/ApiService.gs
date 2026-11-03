@@ -37,6 +37,24 @@ function routeApiRequest_(request, event) {
       case 'changeAdminPassword':
         data = changeAdminPassword_(request, payload, requestId);
         break;
+      case 'listManagedAdminUsers':
+        data = listManagedAdminUsers_(request);
+        break;
+      case 'createManagedAdminUser':
+        data = createManagedAdminUser_(request, payload, requestId);
+        break;
+      case 'updateManagedAdminUser':
+        data = updateManagedAdminUser_(request, payload, requestId);
+        break;
+      case 'disableManagedAdminUser':
+        data = disableManagedAdminUser_(request, payload, requestId);
+        break;
+      case 'resetManagedAdminPassword':
+        data = resetManagedAdminPassword_(request, payload, requestId);
+        break;
+      case 'unlockManagedAdminUser':
+        data = unlockManagedAdminUser_(request, payload, requestId);
+        break;
       case 'getAdminDashboardSummary':
         requireAdmin_(request);
         data = getAdminDashboardSummary_();
