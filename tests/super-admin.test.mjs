@@ -25,7 +25,7 @@ function harness() {
     isValidEmail_: email=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email),
     appError_:(code,message)=>Object.assign(new Error(message),{code}),
     requireAdmin_:()=>({email:login,role:'UNTRUSTED_SNAPSHOT'}),
-    findAdminUserByEmail_: email=>users.find(u=>u.Email===String(email).toLowerCase())||null,
+    findAdminUserByEmail_: email=>users.map((u,i)=>({...u,__rowNumber:i+2})).find(u=>u.Email===String(email).toLowerCase())||null,
     getSheet_:()=>({name:'AdminUsers'}),
     getSheetObjects_:()=>users.map((u,i)=>({...u,__rowNumber:i+2})),
     findObjects_: (_sheet,predicate)=>users.map((u,i)=>({...u,__rowNumber:i+2})).filter(predicate),
