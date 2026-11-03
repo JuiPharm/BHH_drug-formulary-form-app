@@ -4,7 +4,7 @@
  * Disabled unless DRIVE_UPLOAD_ENABLED=true and all Drive secrets are configured.
  */
 import { HttpError } from './auth-service.mjs';
-import { hasDriveConfig, uploadDocumentToDrive, deleteDocumentFromDrive } from './drive-service.mjs';
+import { hasDriveConfig, createSubmissionFoldersOnDrive, uploadDocumentToDrive, deleteDocumentFromDrive } from './drive-service.mjs';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const EXT_TO_MIME = Object.freeze({
@@ -97,8 +97,13 @@ export async function uploadAdminDocument(env, rawId, request, actor, params) {
       || !/^[^\/\\\x00-\x1f]{1,150}$/.test(fileName)) {
     throw new HttpError('INVALID_DOCUMENT_TYPE', 400);
   }
-  const submission = await env.DB.prepare('SELECT id FROM submissions WHERE id = ?').bind(submissionId).first();
+  const submission = await env.DB.prepare(`
+    SELECT s.id, s.submission_no, d.root_folder_id
+    FROM submissions s LEFT JOIN submission_drive_folders d ON d.submission_id=s.id
+    WHERE s.id = ?
+  `).bind(submissionId).first();
   if (!submission) throw new HttpError('SUBMISSION_NOT_FOUND', 404);
+  if (!submission.root_folder_id) throw new HttpError('DRIVE_FOLDER_NOT_INITIALIZED', 409);
   const bytes = await readBoundedBody(request);
   if (!verifySignature(extension, bytes)) throw new HttpError('INVALID_FILE_SIGNATURE', 400);
   const documentId = crypto.randomUUID();
@@ -106,10 +111,20 @@ export async function uploadAdminDocument(env, rawId, request, actor, params) {
     'SELECT COALESCE(MAX(version), 0) AS latest FROM documents WHERE submission_id = ? AND document_type = ?'
   ).bind(submissionId, type).first();
   const version = Number(current?.latest || 0) + 1;
-  const privateName = (submissionId + '_' + type + '_' + documentId + '_' + fileName).slice(0,180);
+  // The original Apps Script builds the filename:
+  // DOCUMENTTYPE_SubmissionNo_vNN_OriginalName.ext
   let file;
   try {
-    file = await uploadDocumentToDrive(env, { fileName: privateName, mimeType, bytes });
+    file = await uploadDocumentToDrive(env, {
+      submissionId,
+      submissionNo: submission.submission_no,
+      rootFolderId: submission.root_folder_id,
+      documentType: type,
+      version,
+      fileName,
+      mimeType,
+      bytes
+    });
   } catch {
     throw new HttpError('DRIVE_UPLOAD_FAILED', 502);
   }
@@ -136,4 +151,55 @@ export async function uploadAdminDocument(env, rawId, request, actor, params) {
     throw new HttpError('DOCUMENT_SAVE_FAILED', 500);
   }
   return { documentId, submissionId, type, version, sha256: file.sha256, sizeBytes: file.sizeBytes };
+}
+
+/** Initialize the exact 14-folder tree using the original DriveApp owner. */
+export async function initializeSubmissionDriveFolders(env, rawId, actor) {
+  if (String(env?.DRIVE_UPLOAD_ENABLED || '').toLowerCase() !== 'true' || !hasDriveConfig(env)) {
+    throw new HttpError('DRIVE_UPLOAD_NOT_CONFIGURED', 503);
+  }
+  const submissionId = String(rawId || '');
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(submissionId)) {
+    throw new HttpError('INVALID_SUBMISSION_ID', 400);
+  }
+  const record = await env.DB.prepare(`
+    SELECT s.id, s.submission_no, s.brand_name, s.strength, s.dosage_form,
+      d.root_folder_id
+    FROM submissions s LEFT JOIN submission_drive_folders d ON d.submission_id=s.id
+    WHERE s.id=?
+  `).bind(submissionId).first();
+  if (!record) throw new HttpError('SUBMISSION_NOT_FOUND', 404);
+  if (record.root_folder_id) return { submissionId, initialized: true };
+  let folderTree;
+  try {
+    folderTree = await createSubmissionFoldersOnDrive(env, {
+      submissionNo: record.submission_no,
+      product: {
+        brandName: record.brand_name,
+        strength: record.strength,
+        dosageForm: record.dosage_form
+      }
+    });
+  } catch {
+    throw new HttpError('DRIVE_FOLDER_CREATION_FAILED', 502);
+  }
+  if (!folderTree?.root?.id || Object.keys(folderTree.folders || {}).length !== 14) {
+    throw new HttpError('INVALID_DRIVE_FOLDER_MAP', 502);
+  }
+  await env.DB.batch([
+    env.DB.prepare(`INSERT OR IGNORE INTO submission_drive_folders
+      (submission_id, root_folder_id, root_folder_url, folder_map_json)
+      VALUES (?,?,?,?)`).bind(
+      submissionId, String(folderTree.root.id), String(folderTree.root.url),
+      JSON.stringify(folderTree)
+    ),
+    env.DB.prepare(`INSERT INTO audit_logs
+      (id,actor_id,action,entity_type,entity_id,request_id,detail_json)
+      VALUES (?,?,?,?,?,?,?)`).bind(
+      crypto.randomUUID(), actor.id, 'createSubmissionDriveFolders',
+      'Submission', submissionId, crypto.randomUUID(),
+      JSON.stringify({ folderCount: Object.keys(folderTree.folders).length })
+    )
+  ]);
+  return { submissionId, initialized: true, folderCount: 14 };
 }
