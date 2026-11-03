@@ -146,6 +146,7 @@ function showLogin() {
   document.querySelector('#user-management-panel').classList.add('hidden');
   document.querySelector('#managed-user-tbody').innerHTML = '';
   clearTemporaryPassword();
+  closePasswordModal();
   loginPassword.value = '';
   loginEmail.focus();
 }
@@ -261,6 +262,7 @@ async function handleLogin(event) {
       admin: result.admin
     });
     state.profile = result.admin;
+    loginPassword.value = '';
     showAdmin(result.admin);
     if (result.admin.mustChangePassword) {
       showAlert('โปรดเปลี่ยนรหัสผ่านชั่วคราวก่อนใช้งานระบบ');
