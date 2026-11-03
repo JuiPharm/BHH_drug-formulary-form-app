@@ -59,7 +59,17 @@ function listManagedAdminUsers_(request) {
   };
 }
 function createManagedAdminUser_(request, payload, requestId) {
+  // Lock serializes duplicate checks, privilege changes and account creation.
   const actor = requireSuperAdmin_(request);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(APP.LOCK_TIMEOUT_MS);
+  try {
+    return createManagedAdminUserLocked_(actor, payload, requestId);
+  } finally {
+    lock.releaseLock();
+  }
+}
+function createManagedAdminUserLocked_(actor, payload, requestId) {
   const email = normalizeAdminEmail_(payload.email);
   if (!isValidEmail_(email)) throw appError_('INVALID_ADMIN_EMAIL', 'E-mail ไม่ถูกต้อง');
   const role = ensureManagedRole_(payload.role || 'PHARMACIST');
@@ -85,6 +95,15 @@ function createManagedAdminUser_(request, payload, requestId) {
 }
 function updateManagedAdminUser_(request, payload, requestId) {
   const actor = requireSuperAdmin_(request);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(APP.LOCK_TIMEOUT_MS);
+  try {
+    return updateManagedAdminUserLocked_(actor, payload, requestId);
+  } finally {
+    lock.releaseLock();
+  }
+}
+function updateManagedAdminUserLocked_(actor, payload, requestId) {
   const email = normalizeAdminEmail_(payload.email);
   const target = findAdminUserByEmail_(email);
   if (!target) throw appError_('ADMIN_NOT_FOUND', 'ไม่พบบัญชีผู้ใช้');
