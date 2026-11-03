@@ -34,5 +34,5 @@ test('PDF renders MONTHS as เดือน', () => {
 });
 
 test('backend version supports current urgent month handling', () => {
-  assert.match(configSource, /VERSION:\s*'1\.3\.(?:[6-9]|[1-9]\\d+)(?:-preprod)?'/);
+  assert.match(configSource, /VERSION:\s*'2\.0\.0-rc\.1'/);
 });
