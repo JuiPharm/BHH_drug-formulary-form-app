@@ -9,5 +9,7 @@ database_name = "bhh-drug-formulary-preprod"
 database_id = "5d4bb9fd-c779-4fea-8a42-02a181da53d8"
 migrations_dir = "migrations"
 
-# R2 is not yet enabled on the connected Cloudflare account.
-# Do not add any public bucket or create a real-data upload route.
+# Hybrid storage: Google Drive via a dedicated service account. No R2 binding.
+# Add GDRIVE_CLIENT_EMAIL, GDRIVE_PRIVATE_KEY and GDRIVE_FOLDER_ID
+# with `wrangler secret put` after granting the account explicit Shared Drive access.
+# Never place those secret values in this file, GitHub, or static frontend.
