@@ -4,7 +4,7 @@
  */
 import { hasDriveConfig } from './drive-service.mjs';
 import { HttpError, requireHospitalStaff } from './auth-service.mjs';
-import { uploadAdminDocument } from './document-api.mjs';
+import { uploadAdminDocument, initializeSubmissionDriveFolders } from './document-api.mjs';
 import {
   listAdminSubmissions, getAdminSubmission, createAdminComment, getAdminSummary
 } from './admin-api.mjs';
@@ -51,6 +51,13 @@ async function adminRoute(request, env, ctx, url, origin) {
       if (actor.role === 'PTC_MEMBER') throw new HttpError('STAFF_WRITE_FORBIDDEN', 403);
       return json(await createAdminComment(env, decodeURIComponent(comments[1]), request, actor), 201, origin);
     }
+    const folderInitialize = pathname.match(/^\/api\/admin\/submissions\/([^/]+)\/drive-folders$/);
+    if (request.method === 'POST' && folderInitialize) {
+      if (actor.role === 'PTC_MEMBER') throw new HttpError('STAFF_WRITE_FORBIDDEN', 403);
+      return json(await initializeSubmissionDriveFolders(
+        env, decodeURIComponent(folderInitialize[1]), actor
+      ), 201, origin);
+    }
     const documentUpload = pathname.match(/^\/api\/admin\/submissions\/([^/]+)\/documents$/);
     if (request.method === 'POST' && documentUpload) {
       if (actor.role === 'PTC_MEMBER') throw new HttpError('STAFF_WRITE_FORBIDDEN', 403);
@@ -89,9 +96,9 @@ export default {
           environment: 'preproduction',
           status: 'ok',
           database: 'connected',
-          fileStorage: 'google-drive',
-          driveIntegration: hasDriveConfig(env) ? 'configured' : 'pending_credentials',
-          release: 'hybrid-preprod'
+          fileStorage: 'google-drive-via-apps-script',
+          driveIntegration: hasDriveConfig(env) ? 'configured' : 'pending_apps_script_bridge',
+          release: 'legacy-drive-apps-script'
         }, 200, origin);
       } catch {
         return json({ service: 'bhh-drug-formulary', environment: 'preproduction', status: 'unavailable' }, 503, origin);
@@ -105,7 +112,7 @@ export default {
         fileStorage: 'google-drive',
         driveUploadEnabled: false,
         driveIntegration: hasDriveConfig(env) ? 'configured' : 'pending_credentials',
-        version: '2.0-hybrid-preprod',
+        version: '2.0-legacy-drive-apps-script',
         message: 'Production remains on Google Apps Script.'
       }, 200, origin);
     }
