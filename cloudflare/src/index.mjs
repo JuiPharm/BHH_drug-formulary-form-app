@@ -51,7 +51,7 @@ async function adminRoute(request, env, ctx, url, origin) {
       if (actor.role === 'PTC_MEMBER') throw new HttpError('STAFF_WRITE_FORBIDDEN', 403);
       return json(await createAdminComment(env, decodeURIComponent(comments[1]), request, actor), 201, origin);
     }
-    const documentUpload = pathname.match(/^\\/api\\/admin\\/submissions\\/([^/]+)\\/documents$/);
+    const documentUpload = pathname.match(/^\/api\/admin\/submissions\/([^/]+)\/documents$/);
     if (request.method === 'POST' && documentUpload) {
       if (actor.role === 'PTC_MEMBER') throw new HttpError('STAFF_WRITE_FORBIDDEN', 403);
       return json(await uploadAdminDocument(
