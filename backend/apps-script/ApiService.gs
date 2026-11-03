@@ -76,6 +76,7 @@ function routeApiRequest_(request, event) {
         break;
       case 'adminUploadSignedPhysicianForm': {
         const admin = requireAdmin_(request);
+        assertWorkflowWriterRole_(admin);
         payload.__actorEmail = admin.email;
         data = adminUploadSignedPhysicianForm_(payload, requestId);
         break;
@@ -88,12 +89,14 @@ function routeApiRequest_(request, event) {
         break;
       case 'retryGeneratePdf': {
         const admin = requireAdmin_(request);
+        assertWorkflowWriterRole_(admin);
         payload.__actorEmail = admin.email;
         data = retryGeneratePdf_(payload, requestId);
         break;
       }
       case 'regenerateSubmissionPdf': {
         const admin = requireAdmin_(request);
+        assertWorkflowWriterRole_(admin);
         payload.__actorEmail = admin.email;
         data = regenerateSubmissionPdf_(payload, requestId);
         break;
@@ -112,12 +115,14 @@ function routeApiRequest_(request, event) {
         break;
       case 'addSubmissionComment': {
         const admin = requireAdmin_(request);
+        assertWorkflowWriterRole_(admin);
         payload.__actorEmail = admin.email;
         data = addSubmissionComment_(payload, requestId);
         break;
       }
       case 'updateStatus': {
         const admin = requireAdmin_(request);
+        assertWorkflowWriterRole_(admin);
         payload.__actorEmail = admin.email;
         data = updateSubmissionStatus_(payload, requestId);
         break;
