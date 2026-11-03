@@ -129,3 +129,8 @@ function doPost(e) {
 function bootstrapOwnerSuperAdminV2() {
   return bootstrapOwnerSuperAdmin_();
 }
+
+/** V2: preview counts/relationships only. Run from new Apps Script project editor. */
+function previewV2DataMigration() { return previewV2Migration_(); }
+/** V2: one-time gated copy after V1 maintenance freeze. Editor-only. */
+function runV2DataMigration() { return runV2Migration_(); }
