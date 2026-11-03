@@ -52,7 +52,7 @@ class Folder {
 function build(){
   const all=new Map(), cache=new Map();
   const prod=new Folder('PRODUCTION_ROOT_123456789','Production',null,all);
-  const stage=new Folder('STAGING_ROOT_123456789','Stage',null,all);
+  const stage=new Folder('STAGING_ROOT_123456789','BHH-PREPROD',null,all);
   const values={
     BHH_BRIDGE_SECRET:secret,
     BHH_BRIDGE_STAGING_FOLDER_ID:stage.getId(),
