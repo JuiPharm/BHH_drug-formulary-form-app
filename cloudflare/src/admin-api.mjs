@@ -54,7 +54,7 @@ export async function getAdminSubmission(env, rawId) {
   if (!main) throw new HttpError('SUBMISSION_NOT_FOUND', 404);
   const [comments, history, documents] = await env.DB.batch([
     env.DB.prepare(`SELECT id, comment_text AS text, visibility, created_by, created_at,
-      'COMMENT' AS type FROM submission_comments WHERE submission_id=?
+      source_legacy_id, 'COMMENT' AS type FROM submission_comments WHERE submission_id=?
       ORDER BY created_at DESC, id DESC`).bind(id),
     env.DB.prepare(`SELECT id, previous_status, new_status, changed_by, changed_at, note
       FROM status_history WHERE submission_id=? ORDER BY changed_at DESC, id DESC`).bind(id),
