@@ -140,8 +140,12 @@ async function loadPublicConfig() {
 }
 
 function showLogin() {
+  state.profile = null;
   adminView.classList.add('hidden');
   loginView.classList.remove('hidden');
+  document.querySelector('#user-management-panel').classList.add('hidden');
+  document.querySelector('#managed-user-tbody').innerHTML = '';
+  clearTemporaryPassword();
   loginPassword.value = '';
   loginEmail.focus();
 }
@@ -166,6 +170,10 @@ function openPasswordModal() {
 }
 
 function closePasswordModal() {
+  if (state.profile?.mustChangePassword) {
+    showAlert('ต้องเปลี่ยน Password ชั่วคราวก่อนใช้งานระบบ');
+    return;
+  }
   passwordModalBackdrop.classList.add('hidden');
   passwordModal.classList.add('hidden');
   changePasswordForm.reset();
@@ -211,6 +219,7 @@ async function handleChangePassword(event) {
       currentPassword,
       newPassword
     });
+    if (state.profile) state.profile.mustChangePassword = false;
     closePasswordModal();
     clearStoredSession();
     closeDetail();
@@ -230,7 +239,7 @@ function showAdmin(profile) {
   document.querySelector('#admin-display-name').textContent = profile.displayName || profile.email;
   document.querySelector('#admin-email').textContent = `${profile.email} · ${profile.role}`;
 
-  document.querySelector('#manage-users-button').classList.toggle('hidden', profile.role !== 'SUPER_ADMIN');
+  document.querySelector('#manage-users-button').classList.toggle('hidden', profile.role !== 'SUPER_ADMIN' || Boolean(profile.mustChangePassword));
   if (profile.role !== 'SUPER_ADMIN') {
     document.querySelector('#user-management-panel').classList.add('hidden');
   }
@@ -253,7 +262,12 @@ async function handleLogin(event) {
     });
     state.profile = result.admin;
     showAdmin(result.admin);
-    await loadDashboard();
+    if (result.admin.mustChangePassword) {
+      showAlert('โปรดเปลี่ยนรหัสผ่านชั่วคราวก่อนใช้งานระบบ');
+      openPasswordModal();
+    } else {
+      await loadDashboard();
+    }
   } catch (error) {
     showAlert(error.message);
   } finally {
@@ -272,7 +286,11 @@ async function restoreSession() {
     const profile = await apiRequest('getAdminProfile');
     state.profile = profile;
     showAdmin(profile);
-    await loadDashboard();
+    if (profile.mustChangePassword) {
+      openPasswordModal();
+    } else {
+      await loadDashboard();
+    }
   } catch {
     clearStoredSession();
     showLogin();
