@@ -100,7 +100,7 @@ test('missing original submission folder must be initialized before upload',asyn
 test('staff upload preserves original filename and stores only file ID in D1',async()=>{
   const previous=globalThis.fetch;
   let called=0;
-  globalThis.fetch=mockBridge({onCommand(cmd)=>{
+  globalThis.fetch=mockBridge({onCommand:cmd=>{
     called++;
     assert.equal(cmd.operation,'uploadDocument');
     assert.equal(cmd.payload.documentType,'RESEARCH_EVIDENCE');
