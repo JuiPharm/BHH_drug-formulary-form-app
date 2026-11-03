@@ -67,8 +67,8 @@ test('admin UI requires reason and calls regenerate action', () => {
 });
 
 test('versions are bumped for regenerate release', () => {
-  assert.match(configSource, /VERSION:\s*'1\.3\.(?:[4-9]|[1-9]\\d+)(?:-preprod)?'/);
-  assert.match(adminConfig, /APP_VERSION:\s*'1\.2\.0'/);
+  assert.match(configSource, /VERSION:\s*'2\.0\.0-rc\.1'/);
+  assert.match(adminConfig, /APP_VERSION:\s*'2\.0\.0-rc\.1'/);
 });
 
 
