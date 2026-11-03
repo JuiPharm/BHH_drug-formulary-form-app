@@ -229,6 +229,11 @@ function showAdmin(profile) {
   adminView.classList.remove('hidden');
   document.querySelector('#admin-display-name').textContent = profile.displayName || profile.email;
   document.querySelector('#admin-email').textContent = `${profile.email} · ${profile.role}`;
+
+  document.querySelector('#manage-users-button').classList.toggle('hidden', profile.role !== 'SUPER_ADMIN');
+  if (profile.role !== 'SUPER_ADMIN') {
+    document.querySelector('#user-management-panel').classList.add('hidden');
+  }
 }
 
 async function handleLogin(event) {
@@ -608,6 +613,150 @@ async function regeneratePdf(event) {
   }
 }
 
+/**
+ * V2 Super Admin user management. All actions are authenticated AGAIN on backend.
+ * Temporary passwords are kept in memory/DOM only until dialog closes.
+ */
+function showTemporaryPassword(email, password) {
+  const modal = document.querySelector('#temporary-password-modal');
+  document.querySelector('#temporary-password-email').textContent = 'สำหรับบัญชี ' + email;
+  document.querySelector('#temporary-password-value').value = String(password || '');
+  document.querySelector('#temporary-password-backdrop').classList.remove('hidden');
+  modal.classList.remove('hidden');
+  document.querySelector('#temporary-password-value').select();
+}
+function clearTemporaryPassword() {
+  document.querySelector('#temporary-password-value').value = '';
+  document.querySelector('#temporary-password-email').textContent = '';
+  document.querySelector('#temporary-password-backdrop').classList.add('hidden');
+  document.querySelector('#temporary-password-modal').classList.add('hidden');
+}
+async function copyTemporaryPassword() {
+  const password = document.querySelector('#temporary-password-value').value;
+  if (!password) return;
+  try {
+    await navigator.clipboard.writeText(password);
+    showToast('คัดลอกรหัสผ่านชั่วคราวแล้ว');
+  } catch {
+    showAlert('ไม่สามารถคัดลอกอัตโนมัติได้ กรุณาเลือกข้อความเพื่อคัดลอก');
+  }
+}
+function renderManagedUsers(users) {
+  const body = document.querySelector('#managed-user-tbody');
+  const me = String(state.profile?.email || '').toLowerCase();
+  const allowedRoles = ['PHARMACIST','SYSTEM_ADMIN','PTC_SECRETARY','PTC_MEMBER','SUPER_ADMIN'];
+  body.innerHTML = users.length ? users.map(user => {
+    const isMe = me === String(user.email).toLowerCase();
+    const options = allowedRoles.map(role => `
+      <option value="${escapeHtml(role)}" ${role === user.role ? 'selected' : ''}>${escapeHtml(role)}</option>
+    `).join('');
+    return `<tr>
+      <td><strong>${escapeHtml(user.email)}</strong></td>
+      <td>${escapeHtml(user.displayName || '—')}</td>
+      <td><select class="managed-role-select" data-email="${escapeHtml(user.email)}"
+        ${isMe ? 'disabled' : ''}>${options}</select></td>
+      <td>${user.isActive ? 'ใช้งาน' : 'ระงับ'}${user.isLocked ? ' (ล็อก)' : ''}</td>
+      <td>${escapeHtml(formatDate(user.lastLoginAt))}</td>
+      <td class="user-management-actions">
+        <button type="button" class="secondary-button" data-user-action="reset"
+          data-email="${escapeHtml(user.email)}" ${user.isActive ? '' : 'disabled'}>Reset PSW</button>
+        <button type="button" class="secondary-button" data-user-action="unlock"
+          data-email="${escapeHtml(user.email)}" ${user.isLocked ? '' : 'disabled'}>ปลดล็อก</button>
+        <button type="button" class="secondary-button" data-user-action="toggle"
+          data-email="${escapeHtml(user.email)}" data-active="${user.isActive ? 'true' : 'false'}"
+          ${isMe ? 'disabled' : ''}>${user.isActive ? 'ลบ/ระงับ' : 'เปิดใช้งาน'}</button>
+      </td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="6" class="muted">ไม่มีข้อมูลผู้ใช้</td></tr>';
+}
+async function loadManagedUsers() {
+  if (state.profile?.role !== 'SUPER_ADMIN') return;
+  try {
+    const result = await apiRequest('listManagedAdminUsers');
+    renderManagedUsers(result.items || []);
+  } catch (error) {
+    showAlert(error.message);
+  }
+}
+async function toggleManagedUsers() {
+  if (state.profile?.role !== 'SUPER_ADMIN') return;
+  const panel = document.querySelector('#user-management-panel');
+  const nowHidden = panel.classList.toggle('hidden');
+  if (!nowHidden) await loadManagedUsers();
+}
+async function handleCreateManagedUser(event) {
+  event.preventDefault();
+  if (state.profile?.role !== 'SUPER_ADMIN') return;
+  const button = event.currentTarget.querySelector('button[type=submit]');
+  button.disabled = true;
+  try {
+    const result = await apiRequest('createManagedAdminUser', {
+      displayName: document.querySelector('#new-user-name').value.trim(),
+      email: document.querySelector('#new-user-email').value.trim(),
+      role: document.querySelector('#new-user-role').value
+    });
+    event.currentTarget.reset();
+    await loadManagedUsers();
+    showTemporaryPassword(result.user.email, result.temporaryPassword);
+  } catch (error) {
+    showAlert(error.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+async function handleManagedUserTableAction(event) {
+  if (state.profile?.role !== 'SUPER_ADMIN') return;
+  const select = event.target.closest('select.managed-role-select');
+  if (select && event.type === 'change') {
+    const email = select.dataset.email;
+    if (!window.confirm('เปลี่ยน Role ของ ' + email + ' เป็น ' + select.value + ' หรือไม่?')) {
+      await loadManagedUsers();
+      return;
+    }
+    select.disabled = true;
+    try {
+      await apiRequest('updateManagedAdminUser', { email, role: select.value });
+      showToast('เปลี่ยนสิทธิ์แล้ว Session เดิมจะถูกยกเลิก');
+    } catch (error) {
+      showAlert(error.message);
+    } finally {
+      await loadManagedUsers();
+    }
+    return;
+  }
+  const button = event.target.closest('button[data-user-action]');
+  if (!button || event.type !== 'click') return;
+  const email = button.dataset.email;
+  const action = button.dataset.userAction;
+  const wasActive = button.dataset.active === 'true';
+  const confirmMessage = action === 'reset'
+    ? 'สร้าง Password ใหม่และยกเลิก Session เดิมของ ' + email + ' ?'
+    : action === 'unlock'
+    ? 'ปลดล็อกบัญชี ' + email + ' ?'
+    : (wasActive ? 'ระงับบัญชี ' : 'เปิดใช้งานบัญชี ') + email + ' ?';
+  if (!window.confirm(confirmMessage)) return;
+  button.disabled = true;
+  try {
+    let result;
+    if (action === 'reset') {
+      result = await apiRequest('resetManagedAdminPassword', { email });
+    } else if (action === 'unlock') {
+      result = await apiRequest('unlockManagedAdminUser', { email });
+    } else if (action === 'toggle') {
+      result = await apiRequest(wasActive ? 'disableManagedAdminUser' : 'updateManagedAdminUser',
+        wasActive ? { email } : { email, isActive: true });
+    }
+    if (action === 'reset') showTemporaryPassword(email, result.temporaryPassword);
+    else showToast('ปรับปรุงบัญชีเรียบร้อย');
+    await loadManagedUsers();
+  } catch (error) {
+    showAlert(error.message);
+    await loadManagedUsers();
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function bindEvents() {
   loginForm.addEventListener('submit', handleLogin);
   document.querySelector('#toggle-password').addEventListener('click', () => {
@@ -615,6 +764,15 @@ function bindEvents() {
     loginPassword.type = visible ? 'password' : 'text';
     document.querySelector('#toggle-password').textContent = visible ? 'แสดง' : 'ซ่อน';
   });
+  document.querySelector('#manage-users-button').addEventListener('click', toggleManagedUsers);
+  document.querySelector('#reload-users-button').addEventListener('click', loadManagedUsers);
+  document.querySelector('#create-user-form').addEventListener('submit', handleCreateManagedUser);
+  document.querySelector('#managed-user-tbody').addEventListener('click', handleManagedUserTableAction);
+  document.querySelector('#managed-user-tbody').addEventListener('change', handleManagedUserTableAction);
+  document.querySelector('#close-temporary-password-button').addEventListener('click', clearTemporaryPassword);
+  document.querySelector('#confirm-temporary-password-button').addEventListener('click', clearTemporaryPassword);
+  document.querySelector('#temporary-password-backdrop').addEventListener('click', clearTemporaryPassword);
+  document.querySelector('#copy-temporary-password-button').addEventListener('click', copyTemporaryPassword);
   document.querySelector('#change-password-button').addEventListener('click', openPasswordModal);
   document.querySelector('#logout-button').addEventListener('click', handleLogout);
   document.querySelector('#close-password-modal').addEventListener('click', closePasswordModal);
