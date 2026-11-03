@@ -6,7 +6,7 @@ import sqlite3
 import unittest
 import uuid
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 MIGRATIONS = [
     ROOT / "cloudflare/migrations/0001_init.sql",
     ROOT / "cloudflare/migrations/0002_multi_document_types.sql",
