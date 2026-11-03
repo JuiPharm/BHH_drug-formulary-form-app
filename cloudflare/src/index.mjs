@@ -47,6 +47,7 @@ async function adminRoute(request, env, ctx, url, origin) {
     }
     const comments = pathname.match(/^\/api\/admin\/submissions\/([^/]+)\/comments$/);
     if (request.method === 'POST' && comments) {
+      if (actor.role === 'PTC_MEMBER') throw new HttpError('STAFF_WRITE_FORBIDDEN', 403);
       return json(await createAdminComment(env, decodeURIComponent(comments[1]), request, actor), 201, origin);
     }
     return json({ error: 'NOT_FOUND' }, 404, origin);
