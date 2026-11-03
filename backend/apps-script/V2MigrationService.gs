@@ -171,6 +171,7 @@ function runV2Migration_() {
     // V2 email receipts must point to the V2 Form App, NOT the old V1 URL.
     setV2SystemSettingOnCopy_(copy, 'FORM_APP_URL', v2FormUrl);
     setV2SystemSettingOnCopy_(copy, 'APP_VERSION', APP.VERSION);
+    setV2SystemSettingOnCopy_(copy, 'DATABASE_SPREADSHEET_ID', copy.getId());
     const postflight = v2MigrationIntegrity_(copy);
     V2_BUSINESS_SHEETS_.forEach(function (name) {
       if (preflight.counts[name] !== postflight.counts[name]) {
