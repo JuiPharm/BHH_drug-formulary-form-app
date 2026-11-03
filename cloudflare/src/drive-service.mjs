@@ -97,29 +97,57 @@ export async function uploadDocumentToDrive(env, input, transport = fetch) {
   if (!name || name.length > 180 || /[\\/\x00-\x1f]/.test(name)) {
     throw new Error('Invalid file name');
   }
-  if (!/^(application\/(pdf|msword|vnd\.[a-z0-9.+-]+)|image\/(png|jpeg))$/.test(mimeType)) {
+  if (!ALLOWED_MIME_TYPES.has(mimeType)) {
     throw new Error('Disallowed MIME type');
   }
   const token = await getGoogleAccessToken(env, transport);
   const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))
     .map(v => v.toString(16).padStart(2, '0')).join('');
-  const boundary = 'bhh_' + crypto.randomUUID().replace(/-/g, '');
-  const meta = JSON.stringify({ name, mimeType, parents: [env.GDRIVE_FOLDER_ID], description: 'BHH Drug Formulary submission attachment' });
-  const body = new Blob([
-    '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n',
-    meta,
-    '\r\n--' + boundary + '\r\nContent-Type: ' + mimeType + '\r\n\r\n',
-    bytes,
-    '\r\n--' + boundary + '--'
-  ]);
-  const response = await transport(UPLOAD_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      authorization: 'Bearer ' + token,
-      'content-type': 'multipart/related; boundary=' + boundary
-    },
-    body
-  });
+  const meta = { name, mimeType, parents: [env.GDRIVE_FOLDER_ID], description: 'BHH Drug Formulary submission attachment' };
+  let response;
+  if (bytes.byteLength > 5 * 1024 * 1024) {
+    // Resumable upload is recommended for larger attachments.
+    const init = await transport(UPLOAD_ENDPOINT.replace('uploadType=multipart', 'uploadType=resumable'), {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer ' + token,
+        'content-type': 'application/json; charset=UTF-8',
+        'x-upload-content-type': mimeType,
+        'x-upload-content-length': String(bytes.byteLength)
+      },
+      body: JSON.stringify(meta)
+    });
+    if (!init.ok) throw new Error('Drive resumable session creation failed');
+    const location = init.headers.get('location');
+    if (!location) throw new Error('Drive resumable session missing location');
+    const session = new URL(location);
+    if (session.protocol !== 'https:' || session.hostname !== 'www.googleapis.com'
+        || !session.pathname.startsWith('/upload/drive/v3/files')) {
+      throw new Error('Invalid Drive resumable upload session location');
+    }
+    response = await transport(session.href, {
+      method: 'PUT',
+      headers: { authorization: 'Bearer ' + token, 'content-type': mimeType },
+      body: bytes
+    });
+  } else {
+    const boundary = 'bhh_' + crypto.randomUUID().replace(/-/g, '');
+    const body = new Blob([
+      '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n',
+      JSON.stringify(meta),
+      '\r\n--' + boundary + '\r\nContent-Type: ' + mimeType + '\r\n\r\n',
+      bytes,
+      '\r\n--' + boundary + '--'
+    ]);
+    response = await transport(UPLOAD_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer ' + token,
+        'content-type': 'multipart/related; boundary=' + boundary
+      },
+      body
+    });
+  }
   if (!response.ok) throw new Error('Private Drive upload failed');
   const result = await response.json();
   if (!result?.id) throw new Error('Drive upload response missing file id');
@@ -131,4 +159,18 @@ export async function uploadDocumentToDrive(env, input, transport = fetch) {
     sizeBytes: bytes.byteLength,
     sha256
   };
+}
+
+/** Delete a privately uploaded file during failed D1 persistence compensation. */
+export async function deleteDocumentFromDrive(env, fileId, transport = fetch) {
+  if (!hasDriveConfig(env)) throw new Error('Drive integration is not configured');
+  const id = String(fileId || '');
+  if (!/^[A-Za-z0-9_-]{1,256}$/.test(id)) throw new Error('Invalid Drive file id');
+  const token = await getGoogleAccessToken(env, transport);
+  const response = await transport(
+    'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?supportsAllDrives=true',
+    { method: 'DELETE', headers: { authorization: 'Bearer ' + token } }
+  );
+  if (!response.ok && response.status !== 404) throw new Error('Drive delete failed');
+  return true;
 }
