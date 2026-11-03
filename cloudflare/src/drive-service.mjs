@@ -10,6 +10,17 @@ const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 const UPLOAD_ENDPOINT = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,mimeType,size,parents';
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
 const MAX_BYTES = 10 * 1024 * 1024;
+const ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'application/msword',
+  'application/vnd.ms-excel',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+]);
 
 export function hasDriveConfig(env) {
   return Boolean(env?.GDRIVE_CLIENT_EMAIL && env?.GDRIVE_PRIVATE_KEY && env?.GDRIVE_FOLDER_ID);
