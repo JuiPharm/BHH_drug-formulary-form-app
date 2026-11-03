@@ -4,7 +4,7 @@
  */
 const APP = Object.freeze({
   NAME: 'Drug Formulary Submission System',
-  VERSION: '1.3.7-preprod',
+  VERSION: '2.0.0-rc.1',
   TIMEZONE: 'Asia/Bangkok',
   DATABASE_FILE_NAME: 'Drug Formulary Submission Database',
   MAIN_FOLDER_NAME: 'Drug Formulary Submissions',
