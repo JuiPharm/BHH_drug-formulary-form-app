@@ -1,0 +1,9 @@
+{
+  "name": "BHH Drug Formulary Admin V2",
+  "short_name": "BHH Admin V2",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#eef3f8",
+  "theme_color": "#075985",
+  "lang": "th"
+}

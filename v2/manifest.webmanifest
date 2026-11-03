@@ -1,0 +1,9 @@
+{
+  "name": "BHH Drug Formulary V2",
+  "short_name": "BHH Form V2",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#075985",
+  "lang": "th"
+}
