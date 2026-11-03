@@ -4,6 +4,7 @@
  */
 import { hasDriveConfig } from './drive-service.mjs';
 import { HttpError, requireHospitalStaff } from './auth-service.mjs';
+import { uploadAdminDocument } from './document-api.mjs';
 import {
   listAdminSubmissions, getAdminSubmission, createAdminComment, getAdminSummary
 } from './admin-api.mjs';
@@ -49,6 +50,13 @@ async function adminRoute(request, env, ctx, url, origin) {
     if (request.method === 'POST' && comments) {
       if (actor.role === 'PTC_MEMBER') throw new HttpError('STAFF_WRITE_FORBIDDEN', 403);
       return json(await createAdminComment(env, decodeURIComponent(comments[1]), request, actor), 201, origin);
+    }
+    const documentUpload = pathname.match(/^\\/api\\/admin\\/submissions\\/([^/]+)\\/documents$/);
+    if (request.method === 'POST' && documentUpload) {
+      if (actor.role === 'PTC_MEMBER') throw new HttpError('STAFF_WRITE_FORBIDDEN', 403);
+      return json(await uploadAdminDocument(
+        env, decodeURIComponent(documentUpload[1]), request, actor, url.searchParams
+      ), 201, origin);
     }
     return json({ error: 'NOT_FOUND' }, 404, origin);
   } catch (error) {
