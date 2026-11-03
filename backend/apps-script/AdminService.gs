@@ -43,11 +43,24 @@ function listSubmissions_(payload) {
   }).sort(function (a, b) {
     return toDateValue_(b.SubmittedAt) - toDateValue_(a.SubmittedAt);
   });
+  const pageRows = filtered.slice(offset, offset + limit);
+  const commentsBySubmission = getSubmissionCommentsMap_(pageRows.map(function (row) {
+    return String(row.SubmissionID);
+  }));
   return {
     total: filtered.length,
     offset: offset,
     limit: limit,
-    items: filtered.slice(offset, offset + limit).map(sanitizeSubmissionSummary_)
+    items: filtered.slice(offset, offset + limit).map(function (row) {
+      const summary = sanitizeSubmissionSummary_(row);
+      const comments = commentsBySubmission[String(row.SubmissionID)] || [];
+      const latest = comments[0] || null;
+      summary.latestComment = latest ? latest.text : '';
+      summary.latestCommentAt = latest ? latest.createdAt : null;
+      summary.latestCommentBy = latest ? latest.createdBy : '';
+      summary.commentCount = comments.length;
+      return summary;
+    })
   };
 }
 function sanitizeSubmissionSummary_(row) {
@@ -87,6 +100,7 @@ function getSubmissionDetail_(payload) {
   const research = findObjects_(getSheet_('ResearchEvidence'), function (row) {
     return String(row.SubmissionID) === String(payload.submissionId);
   });
+  const comments = getSubmissionCommentsMap_([String(payload.submissionId)])[String(payload.submissionId)] || [];
   return {
     submission: sanitizeSubmissionDetail_(context.submission),
     product: sanitizeObject_(context.product),
@@ -96,6 +110,7 @@ function getSubmissionDetail_(payload) {
     approvers: context.approvers.map(sanitizeObject_),
     documents: documents.map(sanitizeDocument_),
     statusHistory: statusHistory.map(sanitizeObject_),
+    comments: comments,
     researchEvidence: research.map(sanitizeObject_)
   };
 }

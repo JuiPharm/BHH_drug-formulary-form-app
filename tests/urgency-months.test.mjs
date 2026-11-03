@@ -33,6 +33,6 @@ test('PDF renders MONTHS as เดือน', () => {
   assert.match(pdfSource, /PLACEHOLDERS\.UrgencyUnitLabel/);
 });
 
-test('backend version is 1.3.6', () => {
-  assert.match(configSource, /VERSION:\s*'1\.3\.6'/);
+test('backend version supports current urgent month handling', () => {
+  assert.match(configSource, /VERSION:\s*'1\.3\.(?:[6-9]|[1-9]\\d+)(?:-preprod)?'/);
 });

@@ -47,6 +47,7 @@ const detailLoading = document.querySelector('#detail-loading');
 const detailContent = document.querySelector('#detail-content');
 const documentList = document.querySelector('#document-list');
 const historyList = document.querySelector('#history-list');
+const commentList = document.querySelector('#comment-list');
 const newStatusSelect = document.querySelector('#new-status-select');
 const rejectReasonField = document.querySelector('#reject-reason-field');
 const toast = document.querySelector('#toast');
@@ -335,6 +336,10 @@ function renderSubmissions(items) {
         <span>${escapeHtml(item.genericName)} · ${escapeHtml(item.dosageForm)}</span>
       </td>
       <td><span class="status-badge">${escapeHtml(statusLabel(item.currentStatus))}</span></td>
+      <td class="comment-cell">
+        <span>${escapeHtml(item.latestComment || '—')}</span>
+        <small>${item.commentCount ? `${Number(item.commentCount)} รายการ · ${escapeHtml(formatDate(item.latestCommentAt))}` : ''}</small>
+      </td>
       <td>${escapeHtml(formatDate(item.submittedAt))}</td>
       <td><span class="${item.signedFormReceived ? 'yes-chip' : 'no-chip'}">${item.signedFormReceived ? 'ได้รับแล้ว' : 'ยังไม่ได้รับ'}</span></td>
       <td><button type="button" class="secondary-button" data-open-submission="${escapeHtml(item.submissionId)}">เปิด</button></td>
@@ -406,6 +411,8 @@ function renderDetail(detail) {
 
   renderDocuments(detail.documents || []);
   renderHistory(detail.statusHistory || []);
+  renderComments(detail.comments || []);
+  document.querySelector('#new-comment').value = '';
 }
 
 function renderDocuments(documents) {
@@ -443,6 +450,37 @@ function renderHistory(history) {
       <span>${escapeHtml(item.Note || '')}</span>
     </div>
   `).join('') : '<p class="muted">ยังไม่มีประวัติสถานะ</p>';
+}
+
+function renderComments(comments) {
+  commentList.innerHTML = comments.length ? comments.map(item => `
+    <div class="timeline-item">
+      <strong>${item.type === 'STATUS_NOTE' ? 'หมายเหตุสถานะ' : 'Comment'}</strong>
+      <span>${escapeHtml(formatDate(item.createdAt))} · ${escapeHtml(item.createdBy || '—')}</span>
+      <span>${escapeHtml(item.text || '')}</span>
+    </div>
+  `).join('') : '<p class="muted">ยังไม่มี Note / Comment</p>';
+}
+
+async function handleCommentSave(event) {
+  event.preventDefault();
+  if (!state.selectedSubmissionId) return;
+  const textarea = document.querySelector('#new-comment');
+  const comment = textarea.value.trim();
+  if (!comment) return;
+  const button = event.submitter || event.currentTarget.querySelector('button[type="submit"]');
+  button.disabled = true;
+  try {
+    const submissionId = state.selectedSubmissionId;
+    await apiRequest('addSubmissionComment', { submissionId, comment });
+    textarea.value = '';
+    showToast('บันทึก Comment สำเร็จ');
+    await Promise.all([loadDashboard(), openDetail(submissionId)]);
+  } catch (error) {
+    showAlert(error.message);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function downloadDocument(documentId, button) {
@@ -599,6 +637,7 @@ function bindEvents() {
   document.querySelector('#close-detail-button').addEventListener('click', closeDetail);
   detailBackdrop.addEventListener('click', closeDetail);
   document.querySelector('#status-update-form').addEventListener('submit', handleStatusUpdate);
+  document.querySelector('#comment-form').addEventListener('submit', handleCommentSave);
   document.querySelector('#signed-upload-form').addEventListener('submit', handleSignedUpload);
   document.querySelector('#regenerate-pdf-form').addEventListener('submit', regeneratePdf);
   newStatusSelect.addEventListener('change', updateRejectReasonVisibility);

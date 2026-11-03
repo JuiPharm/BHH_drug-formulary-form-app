@@ -87,6 +87,7 @@
                 <th>เลขคำขอ</th>
                 <th>ผลิตภัณฑ์</th>
                 <th>สถานะ</th>
+                <th>Comment ล่าสุด</th>
                 <th>วันที่ Submit</th>
                 <th>แบบเซ็น</th>
                 <th></th>
@@ -160,6 +161,18 @@
           </div>
         </form>
         <div id="document-list" class="document-list"></div>
+      </section>
+      <section class="detail-section">
+        <h3>Note / Comment ภายใน</h3>
+        <p class="muted small">บันทึกแยกจากการเปลี่ยนสถานะ และแสดงได้เมื่อเปิดคำขออีกครั้ง</p>
+        <form id="comment-form" class="stack-form">
+          <label class="field">
+            <span>เพิ่ม Comment</span>
+            <textarea id="new-comment" rows="3" maxlength="2000" required placeholder="ระบุข้อมูลเพิ่มเติมสำหรับเจ้าหน้าที่เท่านั้น"></textarea>
+          </label>
+          <button type="submit" class="secondary-button">บันทึก Comment</button>
+        </form>
+        <div id="comment-list" class="timeline"></div>
       </section>
       <section class="detail-section">
         <h3>ประวัติสถานะ</h3>

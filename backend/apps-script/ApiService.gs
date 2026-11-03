@@ -8,6 +8,9 @@ function routeApiRequest_(request, event) {
   try {
     let data;
     switch (action) {
+      case 'cloudflareBridge':
+        data = processCloudflareBridge_(request);
+        break;
       case 'health':
         data = {
           app: APP.NAME,
@@ -89,6 +92,12 @@ function routeApiRequest_(request, event) {
         requireAdmin_(request);
         data = downloadAdminDocument_(payload);
         break;
+      case 'addSubmissionComment': {
+        const admin = requireAdmin_(request);
+        payload.__actorEmail = admin.email;
+        data = addSubmissionComment_(payload, requestId);
+        break;
+      }
       case 'updateStatus': {
         const admin = requireAdmin_(request);
         payload.__actorEmail = admin.email;

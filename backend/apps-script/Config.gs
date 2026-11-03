@@ -4,12 +4,13 @@
  */
 const APP = Object.freeze({
   NAME: 'Drug Formulary Submission System',
-  VERSION: '1.3.6',
+  VERSION: '1.3.7-preprod',
   TIMEZONE: 'Asia/Bangkok',
   DATABASE_FILE_NAME: 'Drug Formulary Submission Database',
   MAIN_FOLDER_NAME: 'Drug Formulary Submissions',
   TEMPLATE_FOLDER_NAME: 'Templates',
   MAX_APPROVERS: 6,
+  MAX_COMMENT_LENGTH: 2000,
   MAX_RESEARCH_FILES: 3,
   REJECT_COOLDOWN_DAYS: 365,
   LOCK_TIMEOUT_MS: 30000,
@@ -200,6 +201,10 @@ const SHEET_SCHEMAS = Object.freeze({
     'PTCChairpersonTitleSnapshot', 'HospitalDirectorNameSnapshot',
     'HospitalDirectorTitleSnapshot', 'SignatoryReferenceDate',
     'SourceManifestJSON', 'Status', 'ErrorMessage'
+  ],
+  SubmissionComments: [
+    'CommentID', 'SubmissionID', 'CommentText', 'CreatedBy',
+    'CreatedAt', 'Visibility', 'IsActive'
   ],
   StatusHistory: [
     'HistoryID', 'SubmissionID', 'PreviousStatus', 'NewStatus', 'ChangedBy',
