@@ -1,112 +1,138 @@
-# BHH Drug Formulary 2.0 — Cloudflare / Google Drive Pre-production
+# BHH Drug Formulary 2.0 — Cloudflare + ORIGINAL Google Apps Script Drive
 
-**Branch-only development. NOT production-ready. No R2 required.**
+> Development branch only. **Not production-ready / not approved for UAT.**
+> **No Cloudflare R2, no Google Drive API service account, no Google Workspace delegation.**
+> The original GitHub Pages and production Apps Script remain unchanged.
 
-## Environment
+## Keep original Google Drive behavior
 
-- Public GitHub Pages Form and Admin URLs: unchanged, still driven by `main`.
-- Preprod Worker: `bhh-drug-formulary-preprod` deployed on Cloudflare with D1 binding.
-- D1: `bhh-drug-formulary-preprod` (APAC location hint, not a Thai-data-residency guarantee).
-- Migrations: `0001_init.sql`, `0002_multi_document_types.sql`, `0003_hospital_users.sql` applied to empty preprod D1.
-- Google Drive: private service-account binary upload and disabled-by-default Access-guarded admin upload route implemented and **mock-tested**. Live integration pending account approval/Worker Secrets.
-- PDF: existing approved Google Docs + Apps Script flow remains the plan; not migrated here.
-- Data: no real hospital records have been copied into D1.
+Existing production code: `backend/apps-script/DriveService.gs`,
+`SubmissionService.gs`, `GeneratePdfService.gs` and `Config.gs`.
 
-## API status
+Original behavior (preserved):
+- Script Properties `DRUG_FORMULARY_MAIN_FOLDER_ID` identifies the original
+  `Drug Formulary Submissions` parent folder. The Apps Script deployment's
+  Google account owns DriveApp operations.
+- Submission creates `<year>/<SubmissionNo>_<BrandName>_<Strength>_<DosageForm>/`.
+- Creates the **same 14 subfolders** specified by `SUBMISSION_FOLDER_DEFINITIONS`
+  (01–13 and 99 archive).
+- Uses `DOCUMENT_FOLDER_KEY` to choose the subfolder.
+- Stored filename uses `buildStoredFileName_()`:
+  `<DocumentType>_<SubmissionNo>_vNN_<OriginalName.ext>`.
+- The file arrives as Base64 at Apps Script, then `DriveApp.createFile(blob)`.
+  Documents retain their Drive File ID, SHA-256, version and metadata.
+- Signed physician forms and generated/combined PDFs use their existing folders.
+- PDF creation continues via the existing `GeneratePdfService.gs` Google Docs
+  Template process. **PDF integration for new D1 submissions is still pending.**
 
-| Route | Availability | Authorization |
-|---|---|---|
-| `GET /health` | Deployed | Public; no customer data |
-| `GET /api/public/config` | Deployed | Public, read-only |
-| `GET /api/admin/summary` | Deployed, **disabled until Access + roles configured** | Cloudflare Access + D1 active hospital role |
-| `GET /api/admin/submissions` | Same | Access + role |
-| `GET /api/admin/submissions/:id` | Same | Access + role |
-| `POST /api/admin/submissions/:id/comments` | Same | Access + pharmacist/admin/secretary role; PTC members read-only |
-| `POST /api/admin/submissions/:id/documents?type=...&filename=...` | Deployed but **feature-flag disabled** | Access + staff write role + Google Drive secrets + `DRIVE_UPLOAD_ENABLED=true` |
+**Important performance distinction:** D1 removes full Google Sheets scans from
+new business API reads, but file upload still invokes Apps Script and retains
+Apps Script execution/request constraints. It is not a direct-to-Drive upload.
 
-Admin routes **never** accept an arbitrary client-supplied email or role. They require
-`ctx.access.getIdentity()` from the Cloudflare platform with an exact
-`CF_ACCESS_AUD` match, then confirm an active row in `hospital_users`.
-No default active user is seeded.
+## Preproduction design: Apps Script Drive bridge
 
-The Admin API is a **new D1 API**, not the legacy Google Apps Script
-`action` interface. The existing GitHub Pages Admin client is still on the
-legacy backend until an explicitly reviewed front-end integration is shipped.
+```
+GitHub Pages (original main branch stays on production GAS)
+        |
+Cloudflare Workers API (preprod; hospital Access + D1 role)
+        |
+        +---- Cloudflare D1 (records, status, comments, audit, folder mapping)
+        |
+        +---- signed HMAC service request ----> Apps Script (STAGING deployment)
+                                              |
+                                              DriveApp (existing account)
+                                              |
+                                              PREPROD folder / year / submission / 14 folders
+```
 
-## Set up Google Drive instead of R2
+Files:
+- `backend/apps-script/CloudflareDriveBridge.gs`: new **staging-only** Apps
+  Script action `cloudflareBridge`, using the existing DriveService helpers.
+- `cloudflare/src/drive-service.mjs`: Worker->Apps Script client signs HMAC.
+- `cloudflare/src/document-api.mjs`: staff-controlled folder setup and file
+  upload (both **feature-flag disabled** by default).
+- `cloudflare/migrations/0004_original_drive_folder_map.sql`:
+  D1 keeps submission-to-original-Drive-folder references.
 
-1. Ask Google Workspace administrators to approve a dedicated service account using
-   a **separate staging Shared Drive folder** or an explicitly approved delegated
-   Workspace identity. The existing production folder must not be changed.
-2. Grant this identity access to the dedicated staging folder only. Service account
-   access to a private user My Drive is **not automatic**.
-3. Store these values as Cloudflare Worker Secrets, **never** in public GitHub:
-   `GDRIVE_CLIENT_EMAIL`, `GDRIVE_PRIVATE_KEY`, `GDRIVE_FOLDER_ID`.
-   Optionally set `GDRIVE_DELEGATED_USER` only with admin-approved delegation.
-4. The server obtains OAuth tokens using a signed RS256 JWT and uploads binary data
-   through the Google Drive API; no Base64 or credentials are sent to the browser.
-   Files above 5 MiB use a resumable Google upload session.
-5. The adapter limits each file to 10 MiB with an explicit MIME allowlist. There is
-   an **Access-protected hospital-staff-only upload route**, but it remains OFF unless
-   `DRIVE_UPLOAD_ENABLED=true` is explicitly set after securing a private staging folder.
-   Uploads validate file magic, extension, MIME type and document category, then save
-   metadata + audit log in D1. On database failure it attempts to delete the Drive file.
-   Representative uploads, malware inspection and controlled downloads are not ready.
-6. Test binary upload and later protected download using synthetic data in the isolated folder. Do not test
-   against the production Google Drive folder.
+### Setup — staging only, without new Google credentials
 
-## Set up Cloudflare Access for hospital staff
+1. Make a **separate copy of the existing Apps Script project** for testing,
+   run by the same authorized Google account, preserving its DriveApp scopes.
+   Do not add the bridge action to the live production deployment.
+2. Create a dedicated Drive folder clearly named, e.g. `BHH PREPROD`, accessible
+   to the Apps Script owner. The bridge rejects the folder if its name lacks
+   PREPROD / STAGING / SANDBOX or it matches the configured main folder ID.
+   **Do not use the existing production main folder as the staging folder.**
+3. In the staging Apps Script project's Script Properties, configure:
+   `BHH_BRIDGE_STAGING_FOLDER_ID` = the dedicated test folder ID,
+   `BHH_BRIDGE_SECRET` = a cryptographically random shared secret (32+
+   characters). Do not place it in source, Google Sheets or the browser.
+4. Deploy **staging** Apps Script as a Web App running as the authorized
+   owner. Ensure the endpoint is accessible to Cloudflare Worker requests;
+   `cloudflareBridge` strictly verifies timestamp (5 minutes), signed body,
+   HMAC-SHA256 and replay nonce. It rejects all other operations.
+5. Add the exact same shared secret via Cloudflare Worker Secret
+   `GAS_BRIDGE_SECRET` and the staging Web App `/exec` URL via
+   `GAS_BRIDGE_URL`. Never paste secrets into GitHub or frontend JavaScript.
+6. Protect Worker routes with Cloudflare Access and configure
+   `CF_ACCESS_AUD` + explicitly approved active staff rows in D1.
+   `PTC_MEMBER` cannot upload or add comments.
+7. Once all controls pass, set `DRIVE_UPLOAD_ENABLED=true` for the
+   *staging Worker only*. Until then, both Drive endpoints return HTTP 503.
 
-1. Create an Access policy protecting the **preprod Worker**, with approved hospital
-   staff only; validate authentication and any group/SSO requirements.
-2. Set `CF_ACCESS_AUD` as a Worker environment secret/config value matching the
-   Access application audience. A missing value denies all Admin routes.
-3. After review, provision rows in preprod D1 `hospital_users` with roles
-   `SYSTEM_ADMIN`, `PHARMACIST`, `PTC_SECRETARY`, `PTC_MEMBER` and
-   `is_active=1` only for explicitly authorized staff.
-4. PTC members can read but cannot post comments. Comments are forced to
-   `INTERNAL`; company-visible messages require a separate representative
-   authentication and disclosure workflow.
-5. Integrating the old GitHub Pages Admin UI with Access-protected Workers
-   requires browser session/CORS testing; static branch code alone is not UAT.
+### Staging API examples (after authorization)
 
-## Validation
+- `POST /api/admin/submissions/:id/drive-folders`:
+  asks Apps Script to create the **original** 14-folder hierarchy under the
+  separately configured preprod parent; D1 stores its root ID + folder map.
+- `POST /api/admin/submissions/:id/documents?type=RESEARCH_EVIDENCE&filename=study.pdf`
+  with `Content-Type: application/pdf` and raw PDF bytes:
+  Worker validates MIME, extension, signature, size (10 MiB), checksum;
+  it sends base64 to the existing DriveApp layer, which builds the original
+  stored filename and category folder. D1 records File ID + SHA-256.
+- On failed D1 persistence, the Worker requests a signed Apps Script
+  trash operation for the staged file (best-effort; monitoring needed).
+
+The old GitHub Pages form does **not** call the new Cloudflare API yet.
+The original production `submitApplication` workflow continues to use
+Google Sheets and Google Drive directly.
+
+## D1 & protected API
+
+- D1: `bhh-drug-formulary-preprod` (APAC primary-location hint, no
+  guarantee of Thailand-only storage). Migrations `0001` to `0004`.
+- Worker: `bhh-drug-formulary-preprod`; `/health` and
+  `/api/public/config` expose only non-sensitive configuration.
+- `GET /api/admin/summary`, `GET /api/admin/submissions`,
+  `GET /api/admin/submissions/:id`, `POST .../comments` require
+  exact verified Cloudflare Access identity and active D1 role.
+- There is no default authorized admin account.
+
+## Tests
 
 ```sh
 node --test tests/*.test.mjs cloudflare/tests/*.test.mjs
 python3 -m unittest discover -s cloudflare/tests -p '*_test.py' -v
-npx wrangler dev --config cloudflare/wrangler.toml
 ```
 
-GitHub Actions `.github/workflows/preprod-checks.yml` runs syntax checks,
-JavaScript tests and SQL migration tests on the development branch.
+Automated checks cover:
+- Signed Worker->Apps Script HMAC, clock expiration and nonce replay.
+- Exact legacy 14 folder names, year/root hierarchy, file naming,
+  document-type placement and checksum.
+- No folder creation in production root and deletion only within staging.
+- Staff RBAC and fail-closed Drive upload flag.
+- D1 schema constraints, folder map migration and internal comments.
 
-Separate D1 smoke test completed on Cloudflare: synthetic company/submission/
-comment were inserted and joined successfully, then removed; re-query confirmed
-zero remaining test records.
+## Hard blockers before Pre-production UAT
 
-## Release blockers before Pre-production UAT
+- Copy Apps Script into isolated staging and configure staging folder/HMAC.
+- Enable Cloudflare Access and provision authorized hospital roles.
+- Finish representative login, submission workflow and exact PDF/Google Docs
+  equivalence for D1-originated records.
+- Scan uploads for malware; implement authorized download, retry/idempotency,
+  orphan reconciliation, rate limiting, and browser CORS testing.
+- Migrate/reconcile historical Google Sheets and Drive file references.
+- UAT, security/privacy review, backup/restore and rollback rehearsal.
 
-- Cloudflare Access policy + approved staff roles, and external representative auth.
-- Google Drive staging service identity, enabled private upload and authorized download endpoints.
-- Full submission workflow, document checklist, duplicate prevention and idempotency.
-- Google Docs/PDF round-trip verification with PTC-004 Rev.13.
-- Legacy Google Sheets data migration, validation, backups and rollback plan.
-- Browser-origin/CORS, rate limits, audit integrity and malware checks.
-- End-to-end UAT with synthetic or de-identified records, then performance tests.
-
-**Do not merge into `main` or switch GitHub Pages `API_URL` yet.**
-
-## Private staff document upload contract (feature-flagged)
-
-`POST /api/admin/submissions/<submission-id>/documents?type=RESEARCH_EVIDENCE&filename=research.pdf`
-
-- Use `Content-Type: application/pdf` and send the **raw file bytes**, not Base64.
-- The Worker must already be protected by Cloudflare Access. The caller must have an
-  active non-PTC_MEMBER staff role. No client-provided user email or role is trusted.
-- Requires staging Drive OAuth credentials and `DRIVE_UPLOAD_ENABLED=true`.
-- Accepts a valid PTC document category and extension/MIME signature, up to 10 MiB.
-- Stores private Drive file ID only server-side. Response contains a document ID,
-  version, checksum and size, **not a direct Google Drive URL**.
-- File virus scanning, external representative ownership and secure download are
-  additional mandatory controls before institution-level UAT.
+**Do not merge the draft PR or change production GitHub Pages `API_URL` until
+hospital acceptance and authorized production cutover.**
