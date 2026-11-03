@@ -1,131 +1,125 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateKeyPairSync, verify } from 'node:crypto';
-import { getGoogleAccessToken, uploadDocumentToDrive, hasDriveConfig } from '../src/drive-service.mjs';
+import { createHmac } from 'node:crypto';
+import {
+  hasDriveConfig, callLegacyDriveBridge, createSubmissionFoldersOnDrive,
+  uploadDocumentToDrive, deleteDocumentFromDrive
+} from '../src/drive-service.mjs';
 
-const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const env = {
-  GDRIVE_CLIENT_EMAIL: 'test-storage@example.iam.gserviceaccount.com',
-  GDRIVE_PRIVATE_KEY: privateKey.export({ type: 'pkcs8', format: 'pem' }),
-  GDRIVE_FOLDER_ID: 'synthetic-dedicated-folder'
+  GAS_BRIDGE_URL: 'https://script.google.com/macros/s/AKfycbSyntheticStagingToken/exec',
+  GAS_BRIDGE_SECRET: 'preprod-synthetic-hmac-key-please-never-reuse-123456789'
+};
+const root = {
+  root: { id:'STAGING_FOLDER_12345',name:'TEST_Drug',url:'https://drive.google.com/fake' },
+  folders: Object.fromEntries(Array.from({length:14},(_,i)=>['FOLDER_'+i,{id:'F'+i,name:'f'+i,url:'https://drive.google.com/fake'}]))
 };
 
-test('Drive adapter stays disabled when secrets are absent', async () => {
-  assert.equal(hasDriveConfig({}), false);
-  await assert.rejects(getGoogleAccessToken({}), /not configured/);
-});
-
-test('OAuth JWT assertion is signed correctly, scoped to Drive and short-lived', async () => {
-  let checked = false;
-  const transport = async (url, options) => {
-    assert.equal(url, 'https://oauth2.googleapis.com/token');
+function mockTransport(capture=()=>{}, fail=false) {
+  return async (url, options) => {
+    assert.equal(url, env.GAS_BRIDGE_URL);
     assert.equal(options.method, 'POST');
-    const assertion = new URLSearchParams(options.body).get('assertion');
-    const [header, payload, sig] = assertion.split('.');
-    const decodedHeader = JSON.parse(Buffer.from(header, 'base64url').toString());
-    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString());
-    assert.equal(decodedHeader.alg, 'RS256');
-    assert.equal(claims.iss, env.GDRIVE_CLIENT_EMAIL);
-    assert.equal(claims.scope, 'https://www.googleapis.com/auth/drive');
-    assert.equal(claims.aud, url);
-    assert.equal(claims.iat, 1790000000);
-    assert.equal(claims.exp, 1790003500);
-    assert.equal(verify('RSA-SHA256', Buffer.from(header + '.' + payload), publicKey, Buffer.from(sig, 'base64url')), true);
-    checked = true;
-    return new Response(JSON.stringify({ access_token: 'mock-access-token' }), { status: 200 });
+    assert.equal(options.headers['content-type'], 'text/plain;charset=utf-8');
+    const request=JSON.parse(options.body);
+    assert.equal(request.action, 'cloudflareBridge');
+    const { timestamp, nonce, signature }=request.bridgeAuth;
+    const expected=createHmac('sha256',env.GAS_BRIDGE_SECRET)
+      .update(timestamp+'\n'+nonce+'\n'+request.payloadBase64).digest('hex');
+    assert.equal(signature,expected);
+    const command=JSON.parse(Buffer.from(request.payloadBase64,'base64').toString());
+    capture(command);
+    if(fail)return Response.json({success:false,data:null,error:{code:'REJECTED'}});
+    if(command.operation==='createSubmissionFolders')return Response.json({success:true,data:root});
+    if(command.operation==='deleteDocument')return Response.json({success:true,data:{trashed:true}});
+    if(command.operation==='uploadDocument')return Response.json({success:true,data:{
+      fileId:'SYNTHETIC_FILE_ID_123456',fileName:'RESEARCH_EVIDENCE_TEST-001_v01_Evidence.pdf',
+      sha256:command.payload.sha256,sizeBytes:6
+    }});
+    return Response.json({success:true,data:{available:true}});
   };
-  const token = await getGoogleAccessToken(env, transport, 1790000000000);
-  assert.equal(token, 'mock-access-token');
-  assert(checked);
+}
+
+test('No Google service account is required, but Apps Script HMAC secret is mandatory',async()=>{
+  assert.equal(hasDriveConfig({}),false);
+  assert.equal(hasDriveConfig({GAS_BRIDGE_URL:env.GAS_BRIDGE_URL,GAS_BRIDGE_SECRET:'short'}),false);
+  assert.equal(hasDriveConfig(env),true);
+  await assert.rejects(callLegacyDriveBridge({},'ping',{}),/not configured/);
 });
 
-test('binary Google Drive upload uses private parent, returns SHA-256, and does not expose token', async () => {
-  let calls = 0;
-  const bytes = new Uint8Array([0, 1, 2, 3, 4, 255]);
-  const transport = async (url, options) => {
-    calls++;
-    if (url.includes('oauth2.googleapis.com')) {
-      return new Response(JSON.stringify({ access_token: 'mock-secret-token' }), { status: 200 });
-    }
-    assert.equal(url.startsWith('https://www.googleapis.com/upload/drive/v3/files?'), true);
-    assert.equal(options.headers.authorization, 'Bearer mock-secret-token');
-    assert.match(options.headers['content-type'], /multipart\/related/);
-    const text = await options.body.text();
-    assert.match(text, /"parents":\["synthetic-dedicated-folder"\]/);
-    assert.match(text, /"name":"TEST-PI.pdf"/);
-    return new Response(JSON.stringify({ id: 'fake-file-id', name: 'TEST-PI.pdf' }), { status: 200 });
-  };
-  const stored = await uploadDocumentToDrive(env, { fileName: 'TEST-PI.pdf', mimeType: 'application/pdf', bytes }, transport);
-  assert.equal(calls, 2);
-  assert.equal(stored.provider, 'google-drive');
-  assert.equal(stored.fileId, 'fake-file-id');
-  assert.equal(stored.sizeBytes, 6);
-  assert.equal(stored.sha256, '40d2af4d7ac41bb624d396eabbe5f30b8b3b70f451f7ad251cd193e02b7b9338');
-  assert.equal(JSON.stringify(stored).includes('mock-secret-token'), false);
+test('HMAC signature covers operation and payload bytes for Apps Script',async()=>{
+  const reply=await callLegacyDriveBridge(env,'ping',{},mockTransport(command=>{
+    assert.equal(command.operation,'ping');
+  }),1790000000000);
+  assert.equal(reply.available,true);
 });
 
-test('rejects oversized, invalid, and empty uploads before Google OAuth call', async () => {
-  let called = false;
-  const network = async () => { called = true; throw Error('should not call'); };
-  for (const input of [
-    { fileName: 'sample.pdf', mimeType: 'application/pdf', bytes: new Uint8Array() },
-    { fileName: 'sample.pdf', mimeType: 'application/pdf', bytes: new Uint8Array(10 * 1024 * 1024 + 1) },
-    { fileName: '../../unsafe.pdf', mimeType: 'application/pdf', bytes: new Uint8Array([1]) },
-    { fileName: 'script.js', mimeType: 'application/javascript', bytes: new Uint8Array([1]) }
-  ]) {
-    await assert.rejects(uploadDocumentToDrive(env, input, network));
-  }
-  assert.equal(called, false);
+test('Create folder command uses same product fields as original DriveApp',async()=>{
+  const result=await createSubmissionFoldersOnDrive(env,{
+    submissionNo:'TEST-001',
+    product:{brandName:'Synthetic',strength:'1 mg',dosageForm:'Tablet'}
+  },mockTransport(command=>{
+    assert.equal(command.operation,'createSubmissionFolders');
+    assert.equal(command.payload.submissionNo,'TEST-001');
+    assert.equal(command.payload.product.brandName,'Synthetic');
+  }));
+  assert.equal(Object.keys(result.folders).length,14);
 });
 
-test('files above 5 MiB use resumable upload session with trusted Google host', async () => {
-  const bytes = new Uint8Array(5 * 1024 * 1024 + 1);
-  bytes.set(new TextEncoder().encode('%PDF-'), 0);
-  let initCalled = false;
-  let putCalled = false;
-  const transport = async (url, options) => {
-    if (url.includes('oauth2.googleapis.com')) {
-      return Response.json({ access_token: 'MOCK-TOKEN' });
-    }
-    if (options.method === 'POST') {
-      assert(url.includes('uploadType=resumable'));
-      assert.equal(options.headers['x-upload-content-length'], String(bytes.length));
-      initCalled = true;
-      return new Response(null, {
-        status: 200,
-        headers: {
-          location: 'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=synthetic'
-        }
-      });
-    }
-    assert.equal(options.method, 'PUT');
-    assert.equal(options.body.length, bytes.length);
-    putCalled = true;
-    return Response.json({ id: 'resumable-synthetic-id' });
-  };
-  const result = await uploadDocumentToDrive(env, {
-    fileName: 'large.pdf', mimeType: 'application/pdf', bytes
-  }, transport);
-  assert.equal(initCalled, true);
-  assert.equal(putCalled, true);
-  assert.equal(result.fileId, 'resumable-synthetic-id');
-  assert.equal(result.sizeBytes, bytes.length);
+test('Binary upload is bridged as Base64 with original naming inputs and SHA256',async()=>{
+  const bytes=new Uint8Array([0,1,2,3,4,255]);
+  let checked=false;
+  const stored=await uploadDocumentToDrive(env,{
+    submissionId:'TEST-1',submissionNo:'TEST-001',rootFolderId:'STAGING_FOLDER_12345',
+    documentType:'RESEARCH_EVIDENCE',version:1,fileName:'Evidence.pdf',
+    mimeType:'application/pdf',bytes
+  },mockTransport(command=>{
+    assert.equal(command.operation,'uploadDocument');
+    assert.equal(command.payload.fileName,'Evidence.pdf');
+    assert.equal(command.payload.documentType,'RESEARCH_EVIDENCE');
+    assert.equal(command.payload.rootFolderId,'STAGING_FOLDER_12345');
+    assert.deepEqual(Buffer.from(command.payload.base64Data,'base64'),Buffer.from(bytes));
+    checked=true;
+  }));
+  assert.equal(checked,true);
+  assert.equal(stored.provider,'drive-apps-script');
+  assert.equal(stored.sizeBytes,6);
+  assert.equal(stored.fileId,'SYNTHETIC_FILE_ID_123456');
+  assert.equal(stored.sha256.length,64);
 });
 
-test('resumable upload rejects an unexpected session URL before transmitting file', async () => {
-  let putCalled = false;
-  const bytes = new Uint8Array(5 * 1024 * 1024 + 1);
-  const transport = async (_url, options) => {
-    if (String(_url).includes('oauth2.googleapis.com')) return Response.json({ access_token: 'MOCK-TOKEN' });
-    if (options.method === 'POST') {
-      return new Response(null, {status: 200, headers: { location: 'https://untrusted.example.test/receive' } });
-    }
-    putCalled = true;
-    throw Error('must not happen');
-  };
-  await assert.rejects(
-    uploadDocumentToDrive(env, {fileName:'large.pdf',mimeType:'application/pdf',bytes}, transport),
-    /Invalid Drive resumable upload session location/
-  );
-  assert.equal(putCalled, false);
+test('Drive deletion is signed and scoped to bridge operation',async()=>{
+  let checked=false;
+  await deleteDocumentFromDrive(env,'SYNTHETIC_FILE_ID_123456',mockTransport(cmd=>{
+    assert.equal(cmd.operation,'deleteDocument');
+    assert.equal(cmd.payload.fileId,'SYNTHETIC_FILE_ID_123456');
+    checked=true;
+  }));
+  assert.equal(checked,true);
+});
+
+test('Rejects invalid MIME, invalid filename, oversized uploads before network',async()=>{
+  let called=0;
+  const fail=async()=>{called++;throw Error('not expected');};
+  const bad=[
+    {fileName:'test.pdf',mimeType:'application/pdf',bytes:new Uint8Array()},
+    {fileName:'test.pdf',mimeType:'application/pdf',bytes:new Uint8Array(10*1024*1024+1)},
+    {fileName:'../test.pdf',mimeType:'application/pdf',bytes:new Uint8Array([1])},
+    {fileName:'test.js',mimeType:'application/javascript',bytes:new Uint8Array([1])}
+  ];
+  for(const item of bad)await assert.rejects(uploadDocumentToDrive(env,item,fail));
+  assert.equal(called,0);
+});
+
+test('Invalid upstream response is not trusted',async()=>{
+  await assert.rejects(callLegacyDriveBridge(env,'ping',{},mockTransport(()=>{},true)),/rejected/);
+  await assert.rejects(callLegacyDriveBridge(env,'arbitraryDestroy',{}),/Disallowed/);
+});
+
+test('Mismatched remote file checksums are rejected',async()=>{
+  const bad=async()=>Response.json({success:true,data:{fileId:'safe-test-file',sizeBytes:6,sha256:'x'.repeat(64)}});
+  await assert.rejects(uploadDocumentToDrive(env,{
+    submissionId:'TEST-1',submissionNo:'TEST-001',rootFolderId:'STAGING_FOLDER_12345',
+    documentType:'RESEARCH_EVIDENCE',version:1,fileName:'Evidence.pdf',
+    mimeType:'application/pdf',bytes:new Uint8Array([0,1,2,3,4,255])
+  },bad),/mismatched/);
 });
