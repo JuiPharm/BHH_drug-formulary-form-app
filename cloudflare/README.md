@@ -8,7 +8,7 @@
 - Preprod Worker: `bhh-drug-formulary-preprod` deployed on Cloudflare with D1 binding.
 - D1: `bhh-drug-formulary-preprod` (APAC location hint, not a Thai-data-residency guarantee).
 - Migrations: `0001_init.sql`, `0002_multi_document_types.sql`, `0003_hospital_users.sql` applied to empty preprod D1.
-- Google Drive: private service-account binary upload adapter implemented and **mock-tested**. Live integration pending account approval/Worker Secrets.
+- Google Drive: private service-account binary upload and disabled-by-default Access-guarded admin upload route implemented and **mock-tested**. Live integration pending account approval/Worker Secrets.
 - PDF: existing approved Google Docs + Apps Script flow remains the plan; not migrated here.
 - Data: no real hospital records have been copied into D1.
 
@@ -22,6 +22,7 @@
 | `GET /api/admin/submissions` | Same | Access + role |
 | `GET /api/admin/submissions/:id` | Same | Access + role |
 | `POST /api/admin/submissions/:id/comments` | Same | Access + pharmacist/admin/secretary role; PTC members read-only |
+| `POST /api/admin/submissions/:id/documents?type=...&filename=...` | Deployed but **feature-flag disabled** | Access + staff write role + Google Drive secrets + `DRIVE_UPLOAD_ENABLED=true` |
 
 Admin routes **never** accept an arbitrary client-supplied email or role. They require
 `ctx.access.getIdentity()` from the Cloudflare platform with an exact
@@ -44,10 +45,14 @@ legacy backend until an explicitly reviewed front-end integration is shipped.
    Optionally set `GDRIVE_DELEGATED_USER` only with admin-approved delegation.
 4. The server obtains OAuth tokens using a signed RS256 JWT and uploads binary data
    through the Google Drive API; no Base64 or credentials are sent to the browser.
-5. The adapter currently limits each file to 10 MiB and has an explicit MIME allowlist.
-   It **is not exposed as a public upload route** before authentication, submission
-   ownership rules, malware inspection and download access controls are approved.
-6. Test upload/download using synthetic data in the isolated folder. Do not test
+   Files above 5 MiB use a resumable Google upload session.
+5. The adapter limits each file to 10 MiB with an explicit MIME allowlist. There is
+   an **Access-protected hospital-staff-only upload route**, but it remains OFF unless
+   `DRIVE_UPLOAD_ENABLED=true` is explicitly set after securing a private staging folder.
+   Uploads validate file magic, extension, MIME type and document category, then save
+   metadata + audit log in D1. On database failure it attempts to delete the Drive file.
+   Representative uploads, malware inspection and controlled downloads are not ready.
+6. Test binary upload and later protected download using synthetic data in the isolated folder. Do not test
    against the production Google Drive folder.
 
 ## Set up Cloudflare Access for hospital staff
@@ -83,7 +88,7 @@ zero remaining test records.
 ## Release blockers before Pre-production UAT
 
 - Cloudflare Access policy + approved staff roles, and external representative auth.
-- Google Drive staging service identity and secure private upload/download endpoints.
+- Google Drive staging service identity, enabled private upload and authorized download endpoints.
 - Full submission workflow, document checklist, duplicate prevention and idempotency.
 - Google Docs/PDF round-trip verification with PTC-004 Rev.13.
 - Legacy Google Sheets data migration, validation, backups and rollback plan.
@@ -91,3 +96,17 @@ zero remaining test records.
 - End-to-end UAT with synthetic or de-identified records, then performance tests.
 
 **Do not merge into `main` or switch GitHub Pages `API_URL` yet.**
+
+## Private staff document upload contract (feature-flagged)
+
+`POST /api/admin/submissions/<submission-id>/documents?type=RESEARCH_EVIDENCE&filename=research.pdf`
+
+- Use `Content-Type: application/pdf` and send the **raw file bytes**, not Base64.
+- The Worker must already be protected by Cloudflare Access. The caller must have an
+  active non-PTC_MEMBER staff role. No client-provided user email or role is trusted.
+- Requires staging Drive OAuth credentials and `DRIVE_UPLOAD_ENABLED=true`.
+- Accepts a valid PTC document category and extension/MIME signature, up to 10 MiB.
+- Stores private Drive file ID only server-side. Response contains a document ID,
+  version, checksum and size, **not a direct Google Drive URL**.
+- File virus scanning, external representative ownership and secure download are
+  additional mandatory controls before institution-level UAT.
