@@ -29,5 +29,7 @@ jobs:
           for file in backend/apps-script/*.gs; do
             node --check < "$file"
           done
-      - name: Run unit tests
+      - name: Run JavaScript unit tests
         run: node --test tests/*.test.mjs cloudflare/tests/*.test.mjs
+      - name: Validate D1 schema migrations with synthetic SQLite fixtures
+        run: python3 -m unittest discover -s cloudflare/tests -p '*_test.py' -v
