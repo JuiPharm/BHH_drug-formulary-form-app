@@ -1,0 +1,33 @@
+name: Preproduction checks
+
+on:
+  push:
+    branches: [feat/cloudflare-preproduction-foundation]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  syntax-and-unit:
+    name: JavaScript / Apps Script checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript modules
+        run: |
+          for file in js/*.js admin/js/*.js cloudflare/src/*.mjs; do
+            node --check --input-type=module < "$file"
+          done
+      - name: Check Google Apps Script syntax
+        run: |
+          for file in backend/apps-script/*.gs; do
+            node --check < "$file"
+          done
+      - name: Run unit tests
+        run: node --test tests/*.test.mjs cloudflare/tests/*.test.mjs
