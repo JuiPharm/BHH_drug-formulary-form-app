@@ -136,7 +136,7 @@ function runV2Migration_() {
     if (props.getProperty(PROP_KEYS.SPREADSHEET_ID)) {
       throw appError_('V2_TARGET_ALREADY_CONFIGURED', 'V2 มีฐานข้อมูลแล้ว ห้ามเขียนทับ');
     }
-    const v2FormUrl = String(props.getProperty('BHH_V2_FORM_APP_URL') || '').replace(/\\/$/, '');
+    const v2FormUrl = String(props.getProperty('BHH_V2_FORM_APP_URL') || '').replace(/\/$/, '');
     if (!/^https:\/\/juipharm\.github\.io\/[A-Za-z0-9._-]+$/.test(v2FormUrl) ||
         v2FormUrl === 'https://juipharm.github.io/BHH_drug-formulary-form-app') {
       throw appError_('V2_FORM_URL_REQUIRED',
