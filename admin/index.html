@@ -49,6 +49,7 @@
           <span id="admin-email" class="muted small"></span>
         </div>
         <div class="user-actions">
+          <button id="manage-users-button" type="button" class="secondary-button hidden">จัดการผู้ใช้</button>
           <button id="change-password-button" type="button" class="secondary-button">เปลี่ยน Password</button>
           <button id="logout-button" type="button" class="secondary-button">ออกจากระบบ</button>
         </div>
@@ -97,6 +98,47 @@
           </table>
         </div>
         <p id="empty-state" class="empty-state hidden">ไม่พบรายการตามเงื่อนไข</p>
+      </section>
+      <section id="user-management-panel" class="panel hidden" aria-labelledby="user-management-title">
+        <div class="panel-head responsive-head">
+          <div>
+            <h2 id="user-management-title">จัดการผู้ใช้ — Super Admin</h2>
+            <p class="muted">เพิ่มบัญชี ปรับสิทธิ์ ระงับบัญชี และรีเซ็ต Password (เก็บประวัติการเปลี่ยนแปลง)</p>
+          </div>
+          <button id="reload-users-button" type="button" class="secondary-button">รีเฟรชรายชื่อ</button>
+        </div>
+        <form id="create-user-form" class="filter-row">
+          <label class="field grow">
+            <span>ชื่อ-สกุล *</span>
+            <input id="new-user-name" maxlength="120" autocomplete="off" required>
+          </label>
+          <label class="field grow">
+            <span>E-mail *</span>
+            <input id="new-user-email" type="email" autocomplete="off" required>
+          </label>
+          <label class="field">
+            <span>Role *</span>
+            <select id="new-user-role">
+              <option value="PHARMACIST">PHARMACIST</option>
+              <option value="SYSTEM_ADMIN">SYSTEM_ADMIN</option>
+              <option value="PTC_SECRETARY">PTC_SECRETARY</option>
+              <option value="PTC_MEMBER">PTC_MEMBER</option>
+              <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+            </select>
+          </label>
+          <button type="submit" class="primary-button">เพิ่มผู้ใช้</button>
+        </form>
+        <div class="table-wrap">
+          <table aria-label="รายชื่อผู้ใช้งานระบบ">
+            <thead>
+              <tr>
+                <th>E-mail</th><th>ชื่อ</th><th>Role</th><th>สถานะ</th><th>Login ล่าสุด</th><th>จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="managed-user-tbody"></tbody>
+          </table>
+        </div>
+        <p class="muted small">การลบบัญชีเป็นการระงับการใช้งานเพื่อรักษา Audit Log ไม่ลบประวัติการอนุมัติยา</p>
       </section>
     </main>
   </div>
@@ -219,6 +261,26 @@
         <button id="save-password-button" type="submit" class="primary-button">บันทึก Password ใหม่</button>
       </div>
     </form>
+  </section>
+
+  <div id="temporary-password-backdrop" class="backdrop hidden"></div>
+  <section id="temporary-password-modal" class="modal-card hidden" role="dialog" aria-modal="true" aria-labelledby="temporary-password-title">
+    <header class="modal-head">
+      <h2 id="temporary-password-title">รหัสผ่านชั่วคราว (แสดงครั้งเดียว)</h2>
+      <button id="close-temporary-password-button" type="button" class="icon-button" aria-label="ปิด">×</button>
+    </header>
+    <div class="modal-body">
+      <p id="temporary-password-email" class="muted"></p>
+      <label class="field">
+        <span>Temporary Password — โปรดเก็บและส่งให้ผู้ใช้ผ่านช่องทางส่วนตัวที่อนุมัติ</span>
+        <input id="temporary-password-value" type="text" readonly autocomplete="off" spellcheck="false">
+      </label>
+      <p class="security-note">ห้ามส่ง Password ในหน้า Chat, URL หรืออีเมลที่ไม่มีมาตรการรักษาความปลอดภัย ผู้ใช้ควรเปลี่ยน Password หลังเข้าสู่ระบบ</p>
+      <div class="modal-actions">
+        <button id="copy-temporary-password-button" type="button" class="secondary-button">คัดลอก</button>
+        <button id="confirm-temporary-password-button" type="button" class="primary-button">ปิดและลบรหัสบนหน้าจอ</button>
+      </div>
+    </div>
   </section>
 
   <div id="toast" class="toast hidden" role="status"></div>
