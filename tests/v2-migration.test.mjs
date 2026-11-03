@@ -44,6 +44,8 @@ function harness(){
   const props={BHH_V2_SOURCE_SPREADSHEET_ID:SOURCE_ID};
   const spreadsheet={getId:()=>SOURCE_ID,getSheetByName:name=>tabs[name]||null};
   const scope={
+    APP:{LOCK_TIMEOUT_MS:30000,DATABASE_FILE_NAME:'Drug Formulary Submission Database',
+      MAIN_FOLDER_NAME:'Drug Formulary Submissions',TEMPLATE_FOLDER_NAME:'Templates',TIMEZONE:'Asia/Bangkok'},
     String,Object,Array,Date,Number,Math,Boolean,
     SpreadsheetApp:{openById:id=>id===SOURCE_ID?spreadsheet:null},
     PropertiesService:{getScriptProperties:()=>({
