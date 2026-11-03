@@ -11,6 +11,7 @@ MIGRATIONS = [
     ROOT / "cloudflare/migrations/0001_init.sql",
     ROOT / "cloudflare/migrations/0002_multi_document_types.sql",
     ROOT / "cloudflare/migrations/0003_hospital_users.sql",
+    ROOT / "cloudflare/migrations/0004_original_drive_folder_map.sql",
 ]
 
 
@@ -35,7 +36,7 @@ class PtcSchemaTest(unittest.TestCase):
         self.assertTrue({
             "submissions", "companies", "representatives", "documents",
             "submission_comments", "status_history", "hospital_users",
-            "ptc_meetings", "ptc_agenda_items", "ptc_decisions", "signatures", "audit_logs"
+            "ptc_meetings", "ptc_agenda_items", "ptc_decisions", "signatures", "audit_logs", "submission_drive_folders"
         }.issubset(actual))
 
     def test_multiple_research_files_same_type_and_version(self):
@@ -76,6 +77,23 @@ class PtcSchemaTest(unittest.TestCase):
         self.assertEqual(self.db.execute(
             "SELECT is_active FROM hospital_users WHERE id='STAFF1'"
         ).fetchone()[0], 0)
+
+    def test_legacy_drive_folder_map_points_to_submission(self):
+        self.db.execute(
+            "INSERT INTO submission_drive_folders "
+            "(submission_id,root_folder_id,root_folder_url,folder_map_json) "
+            "VALUES ('S1','sandbox-folder-001','https://drive.google.com/fake','{}')"
+        )
+        result=self.db.execute(
+            "SELECT root_folder_id FROM submission_drive_folders WHERE submission_id='S1'"
+        ).fetchone()[0]
+        self.assertEqual(result, 'sandbox-folder-001')
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "INSERT INTO submission_drive_folders "
+                "(submission_id,root_folder_id,root_folder_url,folder_map_json) "
+                "VALUES ('S1','another','https://drive.google.com/fake','{}')"
+            )
 
     def test_duplicate_submission_no_blocked(self):
         with self.assertRaises(sqlite3.IntegrityError):
