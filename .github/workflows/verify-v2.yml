@@ -1,0 +1,31 @@
+name: Verify V2 Legacy API Compatibility
+
+on:
+  push:
+    branches: [release/v2-legacy-api-pages, main]
+    paths:
+      - 'v2/**'
+      - 'tests/v2-legacy-api.test.mjs'
+      - '.github/workflows/verify-v2.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-v2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check V2 JavaScript syntax
+        run: |
+          for file in v2/js/*.js v2/admin/js/*.js; do
+            node --check --input-type=module < "$file"
+          done
+      - name: Verify same live Google Apps Script endpoint, V2 isolation and assets
+        run: node --test tests/v2-legacy-api.test.mjs
