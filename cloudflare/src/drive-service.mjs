@@ -1,176 +1,125 @@
 /**
- * Private Google Drive storage adapter for Cloudflare Workers.
- * Does not expose credentials or file links to clients. Invoked only by
- * authenticated API handlers once institutional service-account access is set up.
+ * BHH original Google Drive model — Apps Script DriveApp is the owner.
  *
- * Google Workspace Shared Drive (or approved domain-wide delegation) is required.
- * A service account must have explicit access to the dedicated storage folder.
+ * Cloudflare never receives Google Drive credentials. It signs requests with an
+ * HMAC secret shared only by a SEPARATE staging Apps Script deployment.
+ * Apps Script executes the existing DriveApp folder/document helpers.
+ * Its production Web App and original user-facing file behavior are unchanged.
  */
-const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
-const UPLOAD_ENDPOINT = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,mimeType,size,parents';
-const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
 const MAX_BYTES = 10 * 1024 * 1024;
-const ALLOWED_MIME_TYPES = new Set([
-  'application/pdf',
-  'image/png',
-  'image/jpeg',
-  'application/msword',
-  'application/vnd.ms-excel',
-  'application/vnd.ms-powerpoint',
+const BRIDGE_URL_PATTERN = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/;
+const MIME_ALLOWLIST = new Set([
+  'application/pdf','image/png','image/jpeg','application/msword',
+  'application/vnd.ms-excel','application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation'
 ]);
 
 export function hasDriveConfig(env) {
-  return Boolean(env?.GDRIVE_CLIENT_EMAIL && env?.GDRIVE_PRIVATE_KEY && env?.GDRIVE_FOLDER_ID);
+  const url = String(env?.GAS_BRIDGE_URL || '');
+  return BRIDGE_URL_PATTERN.test(url) && String(env?.GAS_BRIDGE_SECRET || '').length >= 32;
+}
+function b64(bytes) {
+  const slices = [];
+  for (let i = 0; i < bytes.length; i += 8192) {
+    slices.push(String.fromCharCode(...bytes.subarray(i, i + 8192)));
+  }
+  return btoa(slices.join(''));
+}
+function hex(bytes) {
+  return Array.from(bytes).map(v => v.toString(16).padStart(2, '0')).join('');
 }
 
-function base64Url(bytes) {
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
-
-function pkcs8Bytes(pem) {
-  const clean = String(pem || '')
-    .replace(/\\n/g, '\n')
-    .replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----/g, '')
-    .replace(/\s+/g, '');
-  if (!clean || !/^[A-Za-z0-9+/=]+$/.test(clean)) throw new Error('Invalid Drive key configuration');
-  const binary = atob(clean);
-  return Uint8Array.from(binary, c => c.charCodeAt(0));
-}
-
-export async function getGoogleAccessToken(env, transport = fetch, nowMs = Date.now()) {
-  if (!hasDriveConfig(env)) throw new Error('Drive integration is not configured');
-  const key = await crypto.subtle.importKey('pkcs8', pkcs8Bytes(env.GDRIVE_PRIVATE_KEY), {
-    name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256'
-  }, false, ['sign']);
-  const now = Math.floor(nowMs / 1000);
-  const header = base64Url(new TextEncoder().encode(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
-  const claim = {
-    iss: env.GDRIVE_CLIENT_EMAIL,
-    scope: DRIVE_SCOPE,
-    aud: TOKEN_ENDPOINT,
-    iat: now,
-    exp: now + 3500
-  };
-  // Delegation must be explicitly configured by an approved Google Workspace admin.
-  if (env.GDRIVE_DELEGATED_USER) claim.sub = env.GDRIVE_DELEGATED_USER;
-  const payload = base64Url(new TextEncoder().encode(JSON.stringify(claim)));
-  const signingInput = header + '.' + payload;
-  const signature = base64Url(new Uint8Array(await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(signingInput)
+export async function callLegacyDriveBridge(env, operation, payload, transport = fetch, nowMs = Date.now()) {
+  if (!hasDriveConfig(env)) throw new Error('Apps Script Drive bridge is not configured');
+  if (!['ping','createSubmissionFolders','uploadDocument','deleteDocument'].includes(operation)) {
+    throw new Error('Disallowed Drive bridge operation');
+  }
+  const payloadBase64 = b64(new TextEncoder().encode(JSON.stringify({ operation, payload })));
+  if (payloadBase64.length > 19000000) throw new Error('Drive bridge request too large');
+  const timestamp = String(nowMs);
+  const nonce = crypto.randomUUID();
+  const message = timestamp + '\n' + nonce + '\n' + payloadBase64;
+  const signingKey = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(env.GAS_BRIDGE_SECRET),
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const signature = hex(new Uint8Array(await crypto.subtle.sign(
+    'HMAC', signingKey, new TextEncoder().encode(message)
   )));
-  const response = await transport(TOKEN_ENDPOINT, {
+  const response = await transport(env.GAS_BRIDGE_URL, {
     method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: signingInput + '.' + signature
+    redirect: 'follow',
+    headers: { 'content-type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action: 'cloudflareBridge', requestId: crypto.randomUUID(),
+      bridgeAuth: { timestamp, nonce, signature }, payloadBase64
     })
   });
-  if (!response.ok) throw new Error('Google OAuth token request failed');
-  const data = await response.json();
-  if (!data?.access_token || typeof data.access_token !== 'string') {
-    throw new Error('Invalid Google OAuth token response');
+  if (!response.ok) throw new Error('Apps Script Drive bridge network error');
+  const result = await response.json().catch(() => null);
+  if (!result?.success || typeof result?.data !== 'object' || result?.data === null) {
+    throw new Error('Apps Script Drive bridge rejected operation');
   }
-  return data.access_token;
+  return result.data;
 }
 
-/**
- * Server-side upload of one validated file; caller must perform role,
- * submission ownership, document-type and version checks before invoking.
- * Binary body avoids Base64. Size cap intentionally matches existing Form App.
- */
+export async function createSubmissionFoldersOnDrive(env, submission, transport = fetch) {
+  const submissionNo = String(submission?.submissionNo || '');
+  const product = submission?.product || {};
+  if (!/^[a-zA-Z0-9_-]{3,64}$/.test(submissionNo) ||
+      !product.brandName || !product.strength || !product.dosageForm) {
+    throw new Error('Invalid submission folder request');
+  }
+  return callLegacyDriveBridge(env, 'createSubmissionFolders', {
+    submissionNo,
+    product: {
+      brandName: String(product.brandName),
+      strength: String(product.strength),
+      dosageForm: String(product.dosageForm)
+    }
+  }, transport);
+}
+
 export async function uploadDocumentToDrive(env, input, transport = fetch) {
-  if (!hasDriveConfig(env)) throw new Error('Drive integration is not configured');
   const name = String(input?.fileName || '').trim();
   const mimeType = String(input?.mimeType || '').trim();
-  const bytes = input?.bytes instanceof Uint8Array
-    ? input.bytes
-    : input?.bytes instanceof ArrayBuffer ? new Uint8Array(input.bytes) : null;
+  const bytes = input?.bytes instanceof Uint8Array ? input.bytes :
+    input?.bytes instanceof ArrayBuffer ? new Uint8Array(input.bytes) : null;
   if (!bytes || !bytes.length || bytes.length > MAX_BYTES) {
     throw new Error('Invalid file size (maximum 10 MiB per file)');
   }
   if (!name || name.length > 180 || /[\\/\x00-\x1f]/.test(name)) {
     throw new Error('Invalid file name');
   }
-  if (!ALLOWED_MIME_TYPES.has(mimeType)) {
-    throw new Error('Disallowed MIME type');
-  }
-  const token = await getGoogleAccessToken(env, transport);
-  const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))
-    .map(v => v.toString(16).padStart(2, '0')).join('');
-  const meta = { name, mimeType, parents: [env.GDRIVE_FOLDER_ID], description: 'BHH Drug Formulary submission attachment' };
-  let response;
-  if (bytes.byteLength > 5 * 1024 * 1024) {
-    // Resumable upload is recommended for larger attachments.
-    const init = await transport(UPLOAD_ENDPOINT.replace('uploadType=multipart', 'uploadType=resumable'), {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer ' + token,
-        'content-type': 'application/json; charset=UTF-8',
-        'x-upload-content-type': mimeType,
-        'x-upload-content-length': String(bytes.byteLength)
-      },
-      body: JSON.stringify(meta)
-    });
-    if (!init.ok) throw new Error('Drive resumable session creation failed');
-    const location = init.headers.get('location');
-    if (!location) throw new Error('Drive resumable session missing location');
-    const session = new URL(location);
-    if (session.protocol !== 'https:' || session.hostname !== 'www.googleapis.com'
-        || !session.pathname.startsWith('/upload/drive/v3/files')) {
-      throw new Error('Invalid Drive resumable upload session location');
-    }
-    response = await transport(session.href, {
-      method: 'PUT',
-      headers: { authorization: 'Bearer ' + token, 'content-type': mimeType },
-      body: bytes
-    });
-  } else {
-    const boundary = 'bhh_' + crypto.randomUUID().replace(/-/g, '');
-    const body = new Blob([
-      '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n',
-      JSON.stringify(meta),
-      '\r\n--' + boundary + '\r\nContent-Type: ' + mimeType + '\r\n\r\n',
-      bytes,
-      '\r\n--' + boundary + '--'
-    ]);
-    response = await transport(UPLOAD_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer ' + token,
-        'content-type': 'multipart/related; boundary=' + boundary
-      },
-      body
-    });
-  }
-  if (!response.ok) throw new Error('Private Drive upload failed');
-  const result = await response.json();
-  if (!result?.id) throw new Error('Drive upload response missing file id');
-  return {
-    provider: 'google-drive',
-    fileId: String(result.id),
-    name: String(result.name || name),
+  if (!MIME_ALLOWLIST.has(mimeType)) throw new Error('Disallowed MIME type');
+  const sha256 = hex(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)));
+  const result = await callLegacyDriveBridge(env, 'uploadDocument', {
+    submissionId: String(input.submissionId),
+    submissionNo: String(input.submissionNo),
+    documentType: String(input.documentType),
+    rootFolderId: String(input.rootFolderId),
+    version: Number(input.version),
+    fileName: name,
     mimeType,
-    sizeBytes: bytes.byteLength,
-    sha256
+    sha256,
+    base64Data: b64(bytes)
+  }, transport);
+  if (!result?.fileId || result.sha256 !== sha256 || result.sizeBytes !== bytes.length) {
+    throw new Error('Apps Script Drive bridge returned mismatched file metadata');
+  }
+  return {
+    provider: 'drive-apps-script',
+    fileId: String(result.fileId),
+    name: String(result.fileName),
+    sha256,
+    mimeType,
+    sizeBytes: bytes.length
   };
 }
 
-/** Delete a privately uploaded file during failed D1 persistence compensation. */
 export async function deleteDocumentFromDrive(env, fileId, transport = fetch) {
-  if (!hasDriveConfig(env)) throw new Error('Drive integration is not configured');
-  const id = String(fileId || '');
-  if (!/^[A-Za-z0-9_-]{1,256}$/.test(id)) throw new Error('Invalid Drive file id');
-  const token = await getGoogleAccessToken(env, transport);
-  const response = await transport(
-    'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?supportsAllDrives=true',
-    { method: 'DELETE', headers: { authorization: 'Bearer ' + token } }
-  );
-  if (!response.ok && response.status !== 404) throw new Error('Drive delete failed');
-  return true;
+  if (!/^[A-Za-z0-9_-]{10,256}$/.test(String(fileId || ''))) throw new Error('Invalid file id');
+  return callLegacyDriveBridge(env, 'deleteDocument', { fileId: String(fileId) }, transport);
 }
