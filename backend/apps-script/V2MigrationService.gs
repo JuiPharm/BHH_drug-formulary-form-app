@@ -150,6 +150,7 @@ function runV2Migration_() {
       }
     });
     // Commit Script Properties only after successful copy/integrity checks.
+    ensureAdminPasswordPepper_(); // independent V2 pepper, before properties commit
     props.setProperties({
       [PROP_KEYS.SPREADSHEET_ID]: copy.getId(),
       [PROP_KEYS.MAIN_FOLDER_ID]: main.getId(),
@@ -158,7 +159,6 @@ function runV2Migration_() {
       [V2_MIGRATION_GATE_KEY_]: 'COMPLETE',
       [PROP_KEYS.SETUP_AT]: nowIso_()
     });
-    ensureAdminPasswordPepper_(); // independent new V2 pepper
     return {
       success: true,
       targetSpreadsheetId: copy.getId(),
