@@ -1,0 +1,13 @@
+name = "bhh-drug-formulary-preprod"
+main = "src/index.mjs"
+compatibility_date = "2026-11-03"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bhh-drug-formulary-preprod"
+database_id = "5d4bb9fd-c779-4fea-8a42-02a181da53d8"
+migrations_dir = "migrations"
+
+# R2 is not yet enabled on the connected Cloudflare account.
+# Do not add any public bucket or create a real-data upload route.
