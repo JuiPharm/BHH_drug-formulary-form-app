@@ -1,3 +1,4 @@
+import { hasDriveConfig } from './drive-service.mjs';
 /**
  * BHH Drug Formulary Pre-production: read-only bootstrap.
  * No production data and no unauthenticated submission/admin endpoints.
@@ -34,6 +35,8 @@ export default {
           environment: 'preproduction',
           status: 'ok',
           database: 'connected',
+          fileStorage: 'google-drive',
+          driveIntegration: hasDriveConfig(env) ? 'configured' : 'pending_credentials',
           release: 'preprod-foundation'
         }, 200, origin);
       } catch {
@@ -45,6 +48,9 @@ export default {
         appName: 'BHH Drug Formulary & PTC',
         environment: 'preproduction',
         readOnly: true,
+        fileStorage: 'google-drive',
+        driveUploadEnabled: false,
+        driveIntegration: hasDriveConfig(env) ? 'configured' : 'pending_credentials',
         version: '2.0-foundation',
         message: 'Migration in progress — Production remains on Google Apps Script.'
       }, 200, origin);
