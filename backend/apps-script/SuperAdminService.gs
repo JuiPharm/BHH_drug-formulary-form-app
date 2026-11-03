@@ -195,3 +195,16 @@ function bootstrapOwnerSuperAdmin_() {
     lock.releaseLock();
   }
 }
+
+/**
+ * Operational write permission; PTC_MEMBER is read-only.
+ * Clinical PTC decision approval workflows require separate institutional
+ * sign-off and a decision reference before production go-live.
+ */
+function assertWorkflowWriterRole_(admin) {
+  const role = String(admin && admin.role || '').toUpperCase();
+  if (['SUPER_ADMIN','SYSTEM_ADMIN','PHARMACIST','PTC_SECRETARY'].indexOf(role) < 0) {
+    throw appError_('WORKFLOW_WRITE_FORBIDDEN', 'บัญชีนี้ไม่มีสิทธิ์แก้ไขคำขอหรือเอกสาร');
+  }
+  return true;
+}
