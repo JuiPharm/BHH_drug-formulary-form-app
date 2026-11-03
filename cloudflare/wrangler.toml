@@ -9,7 +9,15 @@ database_name = "bhh-drug-formulary-preprod"
 database_id = "5d4bb9fd-c779-4fea-8a42-02a181da53d8"
 migrations_dir = "migrations"
 
-# Hybrid storage: Google Drive via a dedicated service account. No R2 binding.
-# Add GDRIVE_CLIENT_EMAIL, GDRIVE_PRIVATE_KEY and GDRIVE_FOLDER_ID
-# with `wrangler secret put` after granting the account explicit Shared Drive access.
-# Never place those secret values in this file, GitHub, or static frontend.
+# Hybrid storage uses the ORIGINAL Google Apps Script DriveApp execution
+# account and 14-folder structure (no R2 and no Google Service Account).
+#
+# Required secrets for an ISOLATED staging Apps Script deployment:
+#   GAS_BRIDGE_URL   = staging Apps Script /exec endpoint
+#   GAS_BRIDGE_SECRET = shared HMAC-SHA256 secret, >=32 random characters
+#   CF_ACCESS_AUD    = Cloudflare Access application audience
+# The Apps Script staging project itself stores BHH_BRIDGE_SECRET and
+# BHH_BRIDGE_STAGING_FOLDER_ID in Script Properties.
+#
+# DRIVE_UPLOAD_ENABLED must stay unset until explicit preproduction enablement.
+# Never put any of these secret values in this file or the browser.
