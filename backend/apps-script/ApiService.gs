@@ -8,6 +8,9 @@ function routeApiRequest_(request, event) {
   try {
     let data;
     switch (action) {
+      case 'cloudflareBridge':
+        data = processCloudflareBridge_(request);
+        break;
       case 'health':
         data = {
           app: APP.NAME,
