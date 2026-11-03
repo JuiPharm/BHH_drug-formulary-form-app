@@ -90,7 +90,7 @@ test('internal comment writes use verified identity and D1 batch audit', async (
   assert.equal(db.statements.length, 2);
   assert(db.statements[0].sql.includes('INSERT INTO submission_comments'));
   assert(db.statements[1].sql.includes('INSERT INTO audit_logs'));
-  assert.equal(db.statements[0].params[4], 'pharmacy@example.test');
+  assert.equal(db.statements[0].params[3], 'pharmacy@example.test');
 });
 test('PTC member is read-only even when identity is verified', async () => {
   const r = await worker.fetch(req('/api/admin/submissions/TEST-S1/comments', {
